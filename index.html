@@ -66,12 +66,17 @@
                     <p class="subtitle">Overview of your power plant feasibility study</p>
                 </div>
                 <div class="actions">
-                    <button class="btn btn-primary">
+                    <button class="btn btn-primary" onclick="window.inputApps && window.inputApps.resetToDefaults()">
                         <i class="fa-solid fa-plus"></i> New Project
                     </button>
-                    <button class="btn btn-secondary">
-                        <i class="fa-solid fa-download"></i> Export
+                    <button class="btn btn-secondary" onclick="window.inputApps && window.inputApps.exportScenario()">
+                        <i class="fa-solid fa-download"></i> Export JSON
                     </button>
+                    <button class="btn btn-secondary" onclick="document.getElementById('topImportFile').click()">
+                        <i class="fa-solid fa-file-import"></i> Import JSON
+                    </button>
+                    <input type="file" id="topImportFile" style="display:none"
+                        onchange="window.inputApps && window.inputApps.importScenario(this)" accept=".json">
                 </div>
             </header>
 
@@ -88,9 +93,11 @@
 
     <!-- Scripts -->
     <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
-    <script src="storage.js?v=1.0"></script>
-    <script src="calculator.js?v=1.0"></script>
-    <script src="input_manager.js?v=1.0"></script>
+    <!-- Application Helper Scripts -->
+    <script src="storage.js"></script>
+    <script src="calculator.js"></script>
+    <script src="config.js"></script>
+    <script src="input_manager.js"></script>
     <script src="dashboard.js?v=1.0"></script>
     <script src="report_manager.js?v=1.0"></script>
     <script src="financial_manager.js?v=1.0"></script>

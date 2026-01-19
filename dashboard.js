@@ -90,28 +90,39 @@ class DashboardManager {
         }
 
         this.chartInstance = new Chart(ctx, {
-            type: 'bar',
+            type: 'line',
             data: {
                 labels: labels,
                 datasets: [
                     {
-                        label: 'Net Cash Flow',
+                        label: 'Project Cash Flow (Unlevered)',
                         data: results.cashFlows,
-                        backgroundColor: results.cashFlows.map(v => v >= 0 ? 'rgba(16, 185, 129, 0.7)' : 'rgba(239, 68, 68, 0.7)'),
-                        backgroundColor: results.cashFlows.map(v => v >= 0 ? 'rgba(75, 192, 192, 0.7)' : 'rgba(255, 99, 132, 0.7)'), // Corporate Green/Red
-                        borderColor: results.cashFlows.map(v => v >= 0 ? 'rgb(75, 192, 192)' : 'rgb(255, 99, 132)'),
-                        borderWidth: 1,
+                        borderColor: 'rgb(54, 162, 235)', // Blue
+                        backgroundColor: 'rgba(54, 162, 235, 0.1)',
+                        borderWidth: 2,
+                        tension: 0.1,
+                        fill: false,
                         order: 2
+                    },
+                    {
+                        label: 'Equity Cash Flow (Levered)',
+                        data: results.equityCashFlows,
+                        borderColor: 'rgb(16, 185, 129)', // Green
+                        backgroundColor: 'rgba(16, 185, 129, 0.1)',
+                        borderWidth: 2,
+                        tension: 0.1,
+                        fill: false,
+                        order: 3
                     },
                     {
                         label: 'Cumulative Cash Flow',
                         data: results.cumulativeCashFlows,
-                        type: 'line',
-                        borderColor: 'rgb(54, 162, 235)', // Corporate Blue
-                        backgroundColor: 'rgba(54, 162, 235, 0.2)',
+                        borderColor: 'rgb(255, 99, 132)', // Red
+                        backgroundColor: 'rgba(255, 99, 132, 0.1)',
                         borderWidth: 2,
-                        pointBackgroundColor: '#fff',
-                        tension: 0.3,
+                        borderDash: [5, 5], // Dashed line to distinguish
+                        tension: 0.1,
+                        fill: true,
                         order: 1
                     }
                 ]
@@ -119,21 +130,46 @@ class DashboardManager {
             options: {
                 responsive: true,
                 maintainAspectRatio: false,
+                interaction: {
+                    mode: 'index',
+                    intersect: false,
+                },
                 plugins: {
                     legend: {
                         labels: {
-                            color: '#333' // Dark legend text
+                            color: '#333'
+                        }
+                    },
+                    tooltip: {
+                        callbacks: {
+                            label: (context) => {
+                                let label = context.dataset.label || '';
+                                if (label) {
+                                    label += ': ';
+                                }
+                                if (context.parsed.y !== null) {
+                                    label += this.formatCurrency(context.parsed.y);
+                                }
+                                return label;
+                            }
                         }
                     }
                 },
                 scales: {
                     y: {
-                        beginAtZero: true,
+                        type: 'linear',
+                        display: true,
+                        position: 'left',
+                        beginAtZero: false, // Allow negatives for CF
                         grid: {
-                            color: '#e0e0e0' // Light gray grid
+                            color: '#e0e0e0'
                         },
                         ticks: {
-                            color: '#333' // Dark ticks
+                            color: '#333',
+                            callback: (value) => {
+                                if (Math.abs(value) >= 1000000) return (value / 1000000).toFixed(1) + 'M';
+                                return value;
+                            }
                         }
                     },
                     x: {

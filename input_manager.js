@@ -1,21 +1,28 @@
 class InputManager {
     constructor() {
         this.container = document.getElementById('content-area');
+
+        // Load Defaults from Config or fallback
+        const defaults = (window.AppConfig && window.AppConfig.defaults) ? window.AppConfig.defaults : {};
+        const initialOpex = (window.AppConfig && window.AppConfig.initialOpex) ? window.AppConfig.initialOpex : [];
+
         // Initialize with defaults to support calculation without rendering
-        this.currentInputs = {
-            capacity: 10,
-            projectYears: 25,
-            powerFactor: 0.95,
-            hoursPerDay: 24,
-            revenue: { peakRate: 4.5, peakHours: 13, offPeakRate: 2.6, escalation: 0, adderPrice: 0, adderYears: 7 },
-            capex: { construction: 20000000, machinery: 50000000, land: 10000000 },
-            finance: { debtRatio: 70, interestRate: 5.0, loanTerm: 10, taxRate: 20, opexInflation: 1.5, taxHoliday: 0 },
-        };
+        this.currentInputs = JSON.parse(JSON.stringify(defaults)); // Deep Copy
+
+        // Safety Fallback if config failed
+        if (Object.keys(this.currentInputs).length === 0) {
+            console.warn("Config not loaded, using hardcoded fallback.");
+            this.currentInputs = {
+                capacity: 10, projectYears: 25, powerFactor: 0.95, hoursPerDay: 24,
+                revenue: { peakRate: 4.5, peakHours: 13, offPeakRate: 2.6, escalation: 0, adderPrice: 0, adderYears: 7 },
+                degradation: 0.5,
+                capex: { construction: 20, machinery: 50, land: 10 },
+                finance: { debtRatio: 70, interestRate: 5.0, loanTerm: 10, taxRate: 20, opexInflation: 1.5, taxHoliday: 0 },
+            };
+        }
+
         this.state = {
-            opexItems: [
-                { id: 1, name: 'General Maintenance', type: 'fixed', value: 500000, frequency: 1 },
-                { id: 2, name: 'Insurance', type: 'percent_capex', value: 0.5, frequency: 1 }
-            ]
+            opexItems: JSON.parse(JSON.stringify(initialOpex))
         };
     }
 
@@ -45,6 +52,11 @@ class InputManager {
                     <div class="form-group">
                         <label>Operation Hours / Day</label>
                         <input type="number" id="hoursPerDay" value="${this.currentInputs.hoursPerDay}" max="24">
+                    </div>
+
+                    <div class="form-group">
+                        <label>Annual Degradation (%)</label>
+                        <input type="number" id="degradation" value="${this.currentInputs.degradation || 0}" step="0.1" title="Annual reduction in efficiency">
                     </div>
 
                     <div class="divider"></div>
@@ -90,23 +102,23 @@ class InputManager {
                     <h3><i class="fa-solid fa-coins"></i> CAPEX (Investment)</h3>
                     
                     <div class="form-group">
-                        <label>Construction Cost (THB)</label>
+                        <label>Construction Cost (M THB)</label>
                         <input type="number" id="costConstruction" value="${this.currentInputs.capex.construction}">
                     </div>
 
                     <div class="form-group">
-                        <label>Machinery & Equipment (THB)</label>
+                        <label>Machinery & Equipment (M THB)</label>
                         <input type="number" id="costMachinery" value="${this.currentInputs.capex.machinery}">
                     </div>
 
                     <div class="form-group">
-                        <label>Land Cost (THB)</label>
+                        <label>Land Cost (M THB)</label>
                         <input type="number" id="costLand" value="${this.currentInputs.capex.land}">
                     </div>
 
                     <div class="total-display">
                         <span>Total CAPEX:</span>
-                        <span id="totalCapex" class="highlight">0 THB</span>
+                        <span id="totalCapex" class="highlight">0 M THB</span>
                     </div>
 
                     <div class="divider"></div>
@@ -158,10 +170,9 @@ class InputManager {
                     </div>
                 </div>
 
-                <div class="action-bar full-width">
-                    <button class="btn btn-secondary" onclick="inputApps.resetToDefaults()" style="margin-right: 12px;">
-                        <i class="fa-solid fa-rotate-left"></i> Reset
-                    </button>
+                </div>
+
+                <div class="action-bar full-width" style="justify-content: flex-end;">
                     <button class="btn btn-primary btn-lg" onclick="inputApps.userTriggerCalculate()">
                         <i class="fa-solid fa-calculator"></i> Calculate Feasibility
                     </button>
@@ -274,7 +285,7 @@ class InputManager {
         const total = construction + machinery + land;
 
         const totalEl = document.getElementById('totalCapex');
-        if (totalEl) totalEl.textContent = total.toLocaleString() + ' THB';
+        if (totalEl) totalEl.textContent = total.toLocaleString() + ' M THB';
         return total;
     }
 
@@ -288,6 +299,7 @@ class InputManager {
                 projectYears: parseInt(document.getElementById('projectYears').value) || 25,
                 powerFactor: parseFloat(document.getElementById('powerFactor').value) || 1,
                 hoursPerDay: parseFloat(document.getElementById('hoursPerDay').value) || 24,
+                degradation: parseFloat(document.getElementById('degradation').value) || 0,
 
                 revenue: {
                     peakRate: parseFloat(document.getElementById('pricePeak').value) || 0,
@@ -299,9 +311,9 @@ class InputManager {
                 },
 
                 capex: {
-                    construction: parseFloat(document.getElementById('costConstruction').value) || 0,
-                    machinery: parseFloat(document.getElementById('costMachinery').value) || 0,
-                    land: parseFloat(document.getElementById('costLand').value) || 0
+                    construction: (parseFloat(document.getElementById('costConstruction').value) || 0) * 1000000,
+                    machinery: (parseFloat(document.getElementById('costMachinery').value) || 0) * 1000000,
+                    land: (parseFloat(document.getElementById('costLand').value) || 0) * 1000000
                 },
 
                 finance: {
@@ -351,6 +363,7 @@ class InputManager {
             if (inputs.projectYears) document.getElementById('projectYears').value = inputs.projectYears;
             if (inputs.powerFactor) document.getElementById('powerFactor').value = inputs.powerFactor;
             if (inputs.hoursPerDay) document.getElementById('hoursPerDay').value = inputs.hoursPerDay;
+            if (inputs.degradation !== undefined) document.getElementById('degradation').value = inputs.degradation;
 
             if (inputs.revenue) {
                 if (inputs.revenue.peakRate) document.getElementById('pricePeak').value = inputs.revenue.peakRate;
@@ -361,11 +374,11 @@ class InputManager {
                 if (inputs.revenue.adderYears !== undefined) document.getElementById('adderYears').value = inputs.revenue.adderYears;
             }
 
-            // CAPEX
+            // CAPEX (Convert back to Millions for display)
             if (inputs.capex) {
-                if (inputs.capex.construction) document.getElementById('costConstruction').value = inputs.capex.construction;
-                if (inputs.capex.machinery) document.getElementById('costMachinery').value = inputs.capex.machinery;
-                if (inputs.capex.land) document.getElementById('costLand').value = inputs.capex.land;
+                if (inputs.capex.construction) document.getElementById('costConstruction').value = inputs.capex.construction / 1000000;
+                if (inputs.capex.machinery) document.getElementById('costMachinery').value = inputs.capex.machinery / 1000000;
+                if (inputs.capex.land) document.getElementById('costLand').value = inputs.capex.land / 1000000;
             }
 
             // Financial
@@ -407,6 +420,7 @@ class InputManager {
         const revenueEscalation = (inputs.revenue.escalation || 0) / 100;
         const opexInflation = (inputs.finance.opexInflation || 0) / 100;
         const taxHoliday = inputs.finance.taxHoliday || 0;
+        const degradationRate = (inputs.degradation || 0) / 100;
 
         // Adder Params
         const adderPrice = inputs.revenue.adderPrice || 0;
@@ -458,9 +472,10 @@ class InputManager {
         for (let year = 1; year <= projectYears; year++) {
             const escalationFactor = Math.pow(1 + revenueEscalation, year - 1);
             const inflationFactor = Math.pow(1 + opexInflation, year - 1);
+            const degradationFactor = Math.pow(1 - degradationRate, year - 1);
 
-            const yearBaseRevenue = baseAnnualRevenue * escalationFactor;
-            const yearAdderRevenue = (year <= adderYears) ? (totalAnnualEnergy * adderPrice) : 0;
+            const yearBaseRevenue = baseAnnualRevenue * escalationFactor * degradationFactor;
+            const yearAdderRevenue = (year <= adderYears) ? (totalAnnualEnergy * degradationFactor * adderPrice) : 0;
 
             const yearRevenue = yearBaseRevenue + yearAdderRevenue;
             annualRevenue[year] = yearRevenue;
@@ -549,7 +564,8 @@ class InputManager {
             }
 
             costsArray[year] = yearOpex;
-            energyArray[year] = totalAnnualEnergy;
+            costsArray[year] = yearOpex;
+            energyArray[year] = totalAnnualEnergy * Math.pow(1 - degradationRate, year - 1);
         }
 
         // --- 5. Metrics ---
@@ -619,6 +635,50 @@ class InputManager {
         });
 
         return results;
+    }
+
+    exportScenario() {
+        const data = {
+            inputs: this.getInputs(),
+            timestamp: new Date().toISOString(),
+            version: '1.0'
+        };
+        const jsonStr = JSON.stringify(data, null, 2);
+        const blob = new Blob([jsonStr], { type: 'application/json' });
+        const url = URL.createObjectURL(blob);
+
+        const a = document.createElement('a');
+        a.href = url;
+        a.download = `scenario_${new Date().toISOString().split('T')[0]}.json`;
+        document.body.appendChild(a);
+        a.click();
+        document.body.removeChild(a);
+        URL.revokeObjectURL(url);
+    }
+
+    importScenario(inputElement) {
+        const file = inputElement.files[0];
+        if (!file) return;
+
+        const reader = new FileReader();
+        reader.onload = (e) => {
+            try {
+                const data = JSON.parse(e.target.result);
+                if (data && data.inputs) {
+                    this.setState({ inputs: data.inputs });
+                    alert('Scenario imported successfully!');
+                    this.userTriggerCalculate();
+                } else {
+                    alert('Invalid scenario file format.');
+                }
+            } catch (err) {
+                console.error(err);
+                alert('Error reading file.');
+            }
+            // Reset input so same file can be selected again if needed
+            inputElement.value = '';
+        };
+        reader.readAsText(file);
     }
 }
 
