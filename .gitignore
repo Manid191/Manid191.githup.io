@@ -1,0 +1,21 @@
+# OS junk
+.DS_Store
+Thumbs.db
+
+# Node
+node_modules/
+npm-debug.log
+*.log
+
+# Editor
+.vscode/
+.idea/
+
+# Local env
+.env
+.env.local
+.env.*.local
+
+# Build output
+dist/
+build/
