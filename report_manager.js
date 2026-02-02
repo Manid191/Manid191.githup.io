@@ -210,20 +210,33 @@ class ReportManager {
             maximumFractionDigits: 0
         }).format(value);
     }
+    formatDetailedCurrency(value) {
+        // Always in Millions
+        const valM = value / 1000000;
+        return valM.toLocaleString('th-TH', {
+            minimumFractionDigits: 2,
+            maximumFractionDigits: 2
+        });
+    }
+
     generateIncomeStatement(details, period, opexItems) {
         if (!details.annualRevenue) return '';
 
-        // Headers
-        let html = '<thead><tr><th>Item / Year</th>';
+        // Headers with Million Unit Note
+        let html = '<thead><tr><th>Item (Unit: Million THB)</th>';
         for (let i = 1; i <= period; i++) html += `<th>Year ${i}</th>`;
-        html += '</tr></thead><tbody>';
+        html += '</tr></thead><tbody style="font-size: 11px;">';
 
         // Helper for rows
         const addRow = (label, dataArr, isBold = false, isTotal = false) => {
             const style = isTotal ? 'font-weight:bold; background-color:#f9f9f9;' : (isBold ? 'font-weight:600;' : '');
-            html += `<tr style="${style}"><td>${label}</td>`;
+
+            // Add white-space: nowrap to prevent wrapping
+            html += `<tr style="${style}"><td style="white-space: nowrap;">${label}</td>`;
             for (let i = 1; i <= period; i++) {
-                html += `<td>${this.formatCurrency(dataArr[i])}</td>`;
+                const val = dataArr[i];
+                const colorClass = val < 0 ? 'text-danger' : '';
+                html += `<td class="${colorClass}" style="white-space: nowrap;">${this.formatDetailedCurrency(val)}</td>`;
             }
             html += '</tr>';
         };
@@ -234,7 +247,7 @@ class ReportManager {
         // OPEX Items
         html += '<tr><td colspan="' + (period + 1) + '" style="font-weight:bold; color:#666; padding-top:10px;">Operating Expenses</td></tr>';
 
-        // Extract unique item names from year 1 (assuming structure is constant)
+        // Extract unique item names from year 1
         const itemNames = details.annualItemizedOpex && details.annualItemizedOpex[1] ? Object.keys(details.annualItemizedOpex[1]) : [];
 
         itemNames.forEach(name => {
@@ -251,8 +264,29 @@ class ReportManager {
         addRow('EBITDA', details.annualEbitda, true);
         addRow('Depreciation', details.annualDepreciation);
         addRow('EBIT', details.annualEbit, true);
+        addRow('Interest Expense', details.annualInterest); // Interest is expense, usually positive number in array but treated as negative in flow. If input is positive valid, display positive. User asked for negative red. Usually expense is shown positive in brackets or just positive in expense section. 
+        // Wait, `annualInterest` in calculator is calculated as positive value `interestExp`.
+        // If I want to show expense as negative, I should Negate it? 
+        // Usually Income Statement: Revenue (Pos) - Expense (Pos) = Net (Pos). 
+        // If user wants "Negative Red", they might imply Net Income if negative. 
+        // OR they might want Expense to be shown as Negative? 
+        // "Detailed Financial Statement ... ค่าติดลบเป็นสีแดง" -> refers to Negative values. 
+        // Standard tables, if I subtract, the result might be negative. 
+        // Expense is usually shown as positive number under "Expenses".
+        // But if I compute logic: `Revenue - Opex = EBITDA`. 
+        // Let's stick to standard positive display for expenses, but if `Net Income` or `Cash Flow` is negative, show Red.
+        // OR does user mean "Show expenses as negative numbers"?
+        // "ค่าติดลบเป็นสีแดง" -> "Negative values are red". 
+        // If I display expenses as positive, they are not negative. 
+        // I will keep them positive unless user logic produces negative (e.g. loss). 
+        // But `Net Income` can be negative.
+
         addRow('Interest Expense', details.annualInterest);
-        addRow('EBT', details.AnnualEbt || details.annualEbit.map((e, i) => e - (details.annualInterest[i] || 0))); // Fallback calc if not in details
+
+        // EBT Calculation fallback
+        const ebtArr = details.AnnualEbt || details.annualEbit.map((e, i) => e - (details.annualInterest[i] || 0));
+        addRow('EBT', ebtArr);
+
         addRow('Tax', details.annualTax);
         addRow('Net Income', details.annualNetIncome, true, true);
 

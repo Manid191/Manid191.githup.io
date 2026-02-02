@@ -206,6 +206,8 @@ body {
     font-weight: 500;
     cursor: pointer;
     transition: background-color 0.1s;
+    padding: 8px 16px;
+    /* Added padding for better sizing */
 }
 
 .btn-sm {
@@ -482,6 +484,7 @@ select:focus {
 .report-table td {
     border: 1px solid var(--k-border);
     padding: 6px 10px;
+    white-space: nowrap;
 }
 
 .report-table th {
@@ -583,4 +586,31 @@ select:focus {
 
 .card-header {
     margin-bottom: 12px;
+}
+
+/* --- Fixed OPEX Header & Layout Classes --- */
+.opex-header {
+    display: flex;
+    gap: 8px;
+    /* Matches opex-item gap */
+    align-items: center;
+}
+
+.opex-header span {
+    font-size: 13px;
+    /* Matches input font size */
+    padding-left: 9px;
+    /* Align with input text (padding 8px + 1px border) */
+}
+
+/* Flex Utilities */
+.grow-1 {
+    flex: 1;
+    min-width: 0;
+    /* Prevent overflow */
+}
+
+.grow-2 {
+    flex: 2;
+    min-width: 0;
 }

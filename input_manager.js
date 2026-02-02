@@ -16,8 +16,9 @@ class InputManager {
                 capacity: 10, projectYears: 25, powerFactor: 0.95, hoursPerDay: 24,
                 revenue: { peakRate: 4.5, peakHours: 13, offPeakRate: 2.6, escalation: 0, adderPrice: 0, adderYears: 7 },
                 degradation: 0.5,
-                capex: { construction: 20, machinery: 50, land: 10 },
+                capex: { construction: 20, machinery: 50, land: 10, sharePremium: 0, others: 0 },
                 finance: { debtRatio: 70, interestRate: 5.0, loanTerm: 10, taxRate: 20, opexInflation: 1.5, taxHoliday: 0 },
+                personnel: []
             };
         }
 
@@ -27,26 +28,109 @@ class InputManager {
     }
 
     renderInputs() {
+        const fmt = (v) => (Number(v) || 0).toLocaleString('en-US', { maximumFractionDigits: 4 });
+
         this.container.innerHTML = `
             <div class="three-column-layout">
                 
-                <!-- 1. CAPEX (Investment) -->
+                <!-- 1. Technical & Revenue -->
+                <div class="card glass-panel col-item">
+                    <h3><i class="fa-solid fa-bolt"></i> Technical & Revenue</h3>
+                    
+                    <div class="row">
+                        <div class="form-group">
+                            <label>Capacity (MW)</label>
+                            <input type="text" id="capacity" value="${fmt(this.currentInputs.capacity)}" onchange="inputApps.evaluateMathInput(this)">
+                        </div>
+                        <div class="form-group">
+                            <label>Duration (Yrs)</label>
+                            <input type="text" id="projectYears" value="${fmt(this.currentInputs.projectYears)}" onchange="inputApps.evaluateMathInput(this)">
+                        </div>
+                    </div>
+
+                    <div class="row">
+                        <div class="form-group">
+                            <label>Power Factor</label>
+                            <input type="text" id="powerFactor" value="${fmt(this.currentInputs.powerFactor)}" onchange="inputApps.evaluateMathInput(this)">
+                        </div>
+                        <div class="form-group">
+                            <label>Hrs/Day</label>
+                            <input type="text" id="hoursPerDay" value="${fmt(this.currentInputs.hoursPerDay)}" onchange="inputApps.evaluateMathInput(this)">
+                        </div>
+                        <div class="form-group">
+                            <label>Days/Yr</label>
+                            <input type="text" id="daysPerYear" value="${fmt(this.currentInputs.daysPerYear || 365)}" onchange="inputApps.evaluateMathInput(this)">
+                        </div>
+                    </div>
+                    
+                    <div class="form-group">
+                        <label>Degradation (%)</label>
+                        <input type="text" id="degradation" value="${fmt(this.currentInputs.degradation || 0)}" onchange="inputApps.evaluateMathInput(this)">
+                    </div>
+
+                    <div class="divider"></div>
+                    
+                    <div class="row">
+                        <div class="form-group">
+                            <label>Peak Rate</label>
+                            <input type="text" id="pricePeak" value="${fmt(this.currentInputs.revenue.peakRate)}" onchange="inputApps.evaluateMathInput(this)">
+                        </div>
+                        <div class="form-group">
+                            <label>Peak Hrs</label>
+                            <input type="text" id="hoursPeak" value="${fmt(this.currentInputs.revenue.peakHours)}" onchange="inputApps.evaluateMathInput(this)">
+                        </div>
+                    </div>
+
+                    <div class="row">
+                        <div class="form-group">
+                            <label>Off-Peak Rate</label>
+                            <input type="text" id="priceOffPeak" value="${fmt(this.currentInputs.revenue.offPeakRate)}" onchange="inputApps.evaluateMathInput(this)">
+                        </div>
+                        <div class="form-group">
+                            <label>Escalation %</label>
+                            <input type="text" id="revenueEscalation" value="${fmt(this.currentInputs.revenue.escalation)}" onchange="inputApps.evaluateMathInput(this)">
+                        </div>
+                    </div>
+                    
+                    <div class="row">
+                        <div class="form-group">
+                            <label>Adder</label>
+                            <input type="text" id="adderPrice" value="${fmt(this.currentInputs.revenue.adderPrice || 0)}" onchange="inputApps.evaluateMathInput(this)">
+                        </div>
+                        <div class="form-group">
+                            <label>Adder Yrs</label>
+                            <input type="text" id="adderYears" value="${fmt(this.currentInputs.revenue.adderYears || 0)}" onchange="inputApps.evaluateMathInput(this)">
+                        </div>
+                    </div>
+                </div>
+
+                <!-- 2. CAPEX (Investment) -->
                 <div class="card glass-panel col-item">
                     <h3><i class="fa-solid fa-coins"></i> CAPEX</h3>
                     
                     <div class="form-group">
                         <label>Construction (M)</label>
-                        <input type="number" id="costConstruction" value="${this.currentInputs.capex.construction}">
+                        <input type="text" id="costConstruction" value="${fmt(this.currentInputs.capex.construction)}" onchange="inputApps.evaluateMathInput(this)">
                     </div>
 
                     <div class="form-group">
                         <label>Machinery (M)</label>
-                        <input type="number" id="costMachinery" value="${this.currentInputs.capex.machinery}">
+                        <input type="text" id="costMachinery" value="${fmt(this.currentInputs.capex.machinery)}" onchange="inputApps.evaluateMathInput(this)">
                     </div>
 
                     <div class="form-group">
                         <label>Land (M)</label>
-                        <input type="number" id="costLand" value="${this.currentInputs.capex.land}">
+                        <input type="text" id="costLand" value="${fmt(this.currentInputs.capex.land)}" onchange="inputApps.evaluateMathInput(this)">
+                    </div>
+
+                    <div class="form-group">
+                        <label>Share Premium (M)</label>
+                        <input type="text" id="costSharePremium" value="${fmt(this.currentInputs.capex.sharePremium || 0)}" onchange="inputApps.evaluateMathInput(this)">
+                    </div>
+
+                    <div class="form-group">
+                        <label>Others (M)</label>
+                        <input type="text" id="costOthers" value="${fmt(this.currentInputs.capex.others || 0)}" onchange="inputApps.evaluateMathInput(this)">
                     </div>
 
                     <div class="total-display compact">
@@ -55,114 +139,47 @@ class InputManager {
                     </div>
                 </div>
 
-                <!-- 2. Technical & Revenue -->
-                <div class="card glass-panel col-item">
-                    <h3><i class="fa-solid fa-bolt"></i> Technical & Revenue</h3>
-                    
-                    <div class="row">
-                        <div class="form-group">
-                            <label>Capacity (MW)</label>
-                            <input type="number" id="capacity" value="${this.currentInputs.capacity}" step="0.1">
-                        </div>
-                        <div class="form-group">
-                            <label>Duration (Yrs)</label>
-                            <input type="number" id="projectYears" value="${this.currentInputs.projectYears}" min="10" max="30">
-                        </div>
-                    </div>
-
-                    <div class="row">
-                        <div class="form-group">
-                            <label>Power Factor</label>
-                            <input type="number" id="powerFactor" value="${this.currentInputs.powerFactor}" step="0.01" max="1">
-                        </div>
-                        <div class="form-group">
-                            <label>Hrs/Day</label>
-                            <input type="number" id="hoursPerDay" value="${this.currentInputs.hoursPerDay}" max="24">
-                        </div>
-                    </div>
-                    
-                    <div class="form-group">
-                        <label>Degradation (%)</label>
-                        <input type="number" id="degradation" value="${this.currentInputs.degradation || 0}" step="0.1">
-                    </div>
-
-                    <div class="divider"></div>
-                    
-                    <div class="row">
-                        <div class="form-group">
-                            <label>Peak Rate</label>
-                            <input type="number" id="pricePeak" value="${this.currentInputs.revenue.peakRate}">
-                        </div>
-                        <div class="form-group">
-                            <label>Peak Hrs</label>
-                            <input type="number" id="hoursPeak" value="${this.currentInputs.revenue.peakHours}">
-                        </div>
-                    </div>
-
-                    <div class="row">
-                        <div class="form-group">
-                            <label>Off-Peak Rate</label>
-                            <input type="number" id="priceOffPeak" value="${this.currentInputs.revenue.offPeakRate}">
-                        </div>
-                        <div class="form-group">
-                            <label>Escalation %</label>
-                            <input type="number" id="revenueEscalation" value="${this.currentInputs.revenue.escalation}" step="0.1">
-                        </div>
-                    </div>
-                    
-                    <div class="row">
-                        <div class="form-group">
-                            <label>Adder</label>
-                            <input type="number" id="adderPrice" value="${this.currentInputs.revenue.adderPrice || 0}" step="0.01">
-                        </div>
-                        <div class="form-group">
-                            <label>Adder Yrs</label>
-                            <input type="number" id="adderYears" value="${this.currentInputs.revenue.adderYears || 0}">
-                        </div>
-                    </div>
-                </div>
-
                 <!-- 3. Financial Structure -->
-            <div class="card glass-panel col-item">
-                <h3><i class="fa-solid fa-building-columns"></i> Financial Structure</h3>
+                <div class="card glass-panel col-item">
+                    <h3><i class="fa-solid fa-building-columns"></i> Financial Structure</h3>
 
-                <div class="form-group">
-                    <label>Debt Ratio (%)</label>
-                    <input type="number" id="debtRatio" value="${this.currentInputs.finance.debtRatio}" max="100">
-                </div>
-
-                <div class="row">
                     <div class="form-group">
-                        <label>Interest %</label>
-                        <input type="number" id="interestRate" value="${this.currentInputs.finance.interestRate}" step="0.1">
+                        <label>Debt Ratio (%)</label>
+                        <input type="text" id="debtRatio" value="${fmt(this.currentInputs.finance.debtRatio)}" max="100" onchange="inputApps.evaluateMathInput(this)">
+                    </div>
+
+                    <div class="row">
+                        <div class="form-group">
+                            <label>Interest %</label>
+                            <input type="text" id="interestRate" value="${fmt(this.currentInputs.finance.interestRate)}" step="0.1" onchange="inputApps.evaluateMathInput(this)">
+                        </div>
+                        <div class="form-group">
+                            <label>Loan Term</label>
+                            <input type="text" id="loanTerm" value="${fmt(this.currentInputs.finance.loanTerm)}" onchange="inputApps.evaluateMathInput(this)">
+                        </div>
+                    </div>
+
+                    <div class="row">
+                        <div class="form-group">
+                            <label>Corp Tax %</label>
+                            <input type="text" id="taxRate" value="${fmt(this.currentInputs.finance.taxRate)}" onchange="inputApps.evaluateMathInput(this)">
+                        </div>
+                        <div class="form-group">
+                            <label>Cost Inf %</label>
+                            <input type="text" id="opexInflation" value="${fmt(this.currentInputs.finance.opexInflation)}" step="0.1" onchange="inputApps.evaluateMathInput(this)">
+                        </div>
                     </div>
                     <div class="form-group">
-                        <label>Loan Term</label>
-                        <input type="number" id="loanTerm" value="${this.currentInputs.finance.loanTerm}">
+                        <label>Tax Holiday (Yrs)</label>
+                        <input type="text" id="taxHoliday" value="${fmt(this.currentInputs.finance.taxHoliday || 0)}" onchange="inputApps.evaluateMathInput(this)">
                     </div>
-                </div>
 
-                <div class="row">
-                    <div class="form-group">
-                        <label>Corp Tax %</label>
-                        <input type="number" id="taxRate" value="${this.currentInputs.finance.taxRate}">
-                    </div>
-                    <div class="form-group">
-                        <label>Cost Inf %</label>
-                        <input type="number" id="opexInflation" value="${this.currentInputs.finance.opexInflation}" step="0.1">
+                    <div class="action-spacer" style="margin-top: auto; padding-top: 20px;">
+                        <button class="btn btn-primary full-width-btn" onclick="inputApps.userTriggerCalculate()">
+                            <i class="fa-solid fa-calculator"></i> Calculate
+                        </button>
                     </div>
                 </div>
-                <div class="form-group">
-                    <label>Tax Holiday (Yrs)</label>
-                    <input type="number" id="taxHoliday" value="${this.currentInputs.finance.taxHoliday || 0}">
-                </div>
-
-                <div class="action-spacer" style="margin-top: auto; padding-top: 20px;">
-                    <button class="btn btn-primary full-width-btn" onclick="inputApps.userTriggerCalculate()">
-                        <i class="fa-solid fa-calculator"></i> Calculate
-                    </button>
-                </div>
-            </div>
 
             </div>
 
@@ -173,6 +190,15 @@ class InputManager {
                     <button class="btn btn-primary btn-sm" onclick="inputApps.addOpexItem()">
                         <i class="fa-solid fa-plus"></i> Add Item
                     </button>
+                </div>
+
+                <div class="opex-header compact-row" style="padding: 0 0 5px 0; font-weight: bold; color: #666; font-size: 0.9em; border-bottom: 2px solid #eee; margin-bottom: 8px;">
+                    <span class="grow-2">Description</span>
+                    <span class="grow-1">Type</span>
+                    <span style="width: 80px;">Qty</span>
+                    <span class="grow-1">Unit Price</span>
+                    <span class="grow-1">Frequency</span>
+                    <span style="width: 32px;"></span> <!-- Spacer for delete button -->
                 </div>
 
                 <div id="opex-list" class="opex-container">
@@ -210,6 +236,22 @@ class InputManager {
         list.innerHTML = '';
 
         this.state.opexItems.forEach((item, index) => {
+            const freqType = item.freqType || 'yearly';
+
+            let extraInputs = '';
+            if (freqType === 'every_n') {
+                extraInputs = `<input type="number" class="input-compact" style="width: 60px;" placeholder="Years" 
+                    value="${item.customN || 5}" onchange="inputApps.updateOpex(${index}, 'customN', this.value)" title="Every N Years">`;
+            } else if (freqType === 'period') {
+                extraInputs = `
+                    <input type="number" class="input-compact" style="width: 50px;" placeholder="Start" 
+                        value="${item.startYear || 1}" onchange="inputApps.updateOpex(${index}, 'startYear', this.value)" title="Start Year">
+                    <span style="font-size:12px; color:#666;">-</span>
+                    <input type="number" class="input-compact" style="width: 50px;" placeholder="End" 
+                        value="${item.endYear || 25}" onchange="inputApps.updateOpex(${index}, 'endYear', this.value)" title="End Year">
+                `;
+            }
+
             const html = `
                 <div class="opex-item compact-row">
                     <input type="text" class="input-compact grow-2" placeholder="Item Name" 
@@ -221,14 +263,22 @@ class InputManager {
                         <option value="percent_capex" ${item.type === 'percent_capex' ? 'selected' : ''}>% CAPEX</option>
                     </select>
 
-                    <input type="text" class="input-compact grow-1" placeholder="Value (e.g. 50*12)" 
-                           value="${item.value}" onchange="inputApps.handleOpexValueChange(${index}, this)" title="Annual Value">
+                    <input type="text" class="input-compact" style="width: 80px;" placeholder="Qty" 
+                           value="${(parseFloat(item.quantity) || 1).toLocaleString('en-US')}" onchange="inputApps.evaluateMathInput(this); inputApps.updateOpex(${index}, 'quantity', this.value)" title="Quantity">
 
-                    <select class="input-compact grow-1" onchange="inputApps.updateOpex(${index}, 'frequency', parseInt(this.value))" title="Frequency">
-                        <option value="1" ${item.frequency === 1 ? 'selected' : ''}>Every Year</option>
-                        <option value="3" ${item.frequency === 3 ? 'selected' : ''}>Every 3 Years</option>
-                        <option value="5" ${item.frequency === 5 ? 'selected' : ''}>Every 5 Years</option>
-                    </select>
+                    <input type="text" class="input-compact grow-1" placeholder="Value (e.g. 50*12)" 
+                           value="${(parseFloat(item.value) || 0).toLocaleString('en-US', { maximumFractionDigits: 4 })}" onchange="inputApps.handleOpexValueChange(${index}, this)" title="Unit Price">
+
+                    <div class="grow-1" style="display:flex; gap:4px; align-items:center;">
+                        <select class="input-compact" style="flex:1; min-width:80px;" onchange="inputApps.updateOpex(${index}, 'freqType', this.value)" title="Frequency">
+                            <option value="daily" ${freqType === 'daily' ? 'selected' : ''}>Per Day (Op. Days)</option>
+                            <option value="monthly" ${freqType === 'monthly' ? 'selected' : ''}>Per Month</option>
+                            <option value="yearly" ${freqType === 'yearly' ? 'selected' : ''}>Per Year</option>
+                            <option value="every_n" ${freqType === 'every_n' ? 'selected' : ''}>Every N Years</option>
+                            <option value="period" ${freqType === 'period' ? 'selected' : ''}>Custom Period</option>
+                        </select>
+                        ${extraInputs}
+                    </div>
 
                     <button class="btn btn-danger btn-icon btn-sm" onclick="inputApps.removeOpex(${index})" title="Remove">
                         <i class="fa-solid fa-times"></i>
@@ -241,14 +291,18 @@ class InputManager {
 
     handleOpexValueChange(index, inputElement) {
         let valueStr = inputElement.value;
+        // Remove existing commas for calculation
+        valueStr = valueStr.replace(/,/g, '');
+
         // Allow numbers, math operators, decimals, and spaces
         if (/^[0-9+\-*/().\s]+$/.test(valueStr)) {
             try {
                 // Safe evaluation
                 const result = Function('"use strict";return (' + valueStr + ')')();
                 if (isFinite(result)) {
-                    inputElement.value = result; // Update UI with calculated result
-                    this.updateOpex(index, 'value', parseFloat(result));
+                    // Update UI with comma formatting
+                    inputElement.value = result.toLocaleString('en-US', { maximumFractionDigits: 4 });
+                    this.updateOpex(index, 'value', result); // Ensure state is updated with Number
                     return;
                 }
             } catch (e) {
@@ -256,24 +310,46 @@ class InputManager {
             }
         }
 
-        // Fallback or if already a number
+        // Fallback parsing
         const num = parseFloat(valueStr);
         if (!isNaN(num)) {
             this.updateOpex(index, 'value', num);
         } else {
-            // Reset if invalid
-            inputElement.value = this.state.opexItems[index].value || 0;
-            alert("Invalid input. Please enter a number or a simple math expression (e.g. 50*12).");
+            this.updateOpex(index, 'value', valueStr);
+        }
+    }
+
+    evaluateMathInput(inputElement) {
+        let valueStr = inputElement.value;
+        // Remove existing commas for calculation
+        valueStr = valueStr.replace(/,/g, '');
+
+        // Allow numbers, math operators, decimals, and spaces
+        if (/^[0-9+\-*/().\s]+$/.test(valueStr)) {
+            try {
+                // Safe evaluation
+                const result = Function('"use strict";return (' + valueStr + ')')();
+                if (isFinite(result)) {
+                    // Format with commas and optional decimals
+                    inputElement.value = result.toLocaleString('en-US', { maximumFractionDigits: 4 });
+                }
+            } catch (e) {
+                // Ignore invalid
+            }
         }
     }
 
     addOpexItem() {
         this.state.opexItems.push({
             id: Date.now(),
-            name: 'New Expense',
+            name: '',
             type: 'fixed',
             value: 0,
-            frequency: 1
+            quantity: 1,
+            freqType: 'yearly',
+            customN: 5,
+            startYear: 1,
+            endYear: 25
         });
         this.renderOpexList();
     }
@@ -285,11 +361,12 @@ class InputManager {
 
     updateOpex(index, field, value) {
         this.state.opexItems[index][field] = value;
+        this.renderOpexList();
     }
 
     attachListeners() {
         // Auto-calculate CAPEX total
-        const capexInputs = ['costConstruction', 'costMachinery', 'costLand'];
+        const capexInputs = ['costConstruction', 'costMachinery', 'costLand', 'costSharePremium', 'costOthers'];
         capexInputs.forEach(id => {
             const el = document.getElementById(id);
             if (el) el.addEventListener('input', () => this.updateCapexTotal());
@@ -298,10 +375,15 @@ class InputManager {
 
     updateCapexTotal() {
         if (!document.getElementById('costConstruction')) return;
-        const construction = parseFloat(document.getElementById('costConstruction').value) || 0;
-        const machinery = parseFloat(document.getElementById('costMachinery').value) || 0;
-        const land = parseFloat(document.getElementById('costLand').value) || 0;
-        const total = construction + machinery + land;
+        const getVal = (id) => parseFloat(document.getElementById(id)?.value?.replace(/,/g, '') || 0);
+
+        const construction = getVal('costConstruction');
+        const machinery = getVal('costMachinery');
+        const land = getVal('costLand');
+        const sharePremium = getVal('costSharePremium');
+        const others = getVal('costOthers');
+
+        const total = construction + machinery + land + sharePremium + others;
 
         const totalEl = document.getElementById('totalCapex');
         if (totalEl) totalEl.textContent = total.toLocaleString() + ' M THB';
@@ -312,37 +394,54 @@ class InputManager {
         // If inputs are in DOM, update state. If not, return state.
         const capEl = document.getElementById('capacity');
         if (capEl) {
+            // Helper to safe parse with comma support
+            const getValue = (id) => {
+                const el = document.getElementById(id);
+                if (!el) return 0;
+                // Remove commas and parse
+                const clean = el.value.replace(/,/g, '');
+                return parseFloat(clean) || 0;
+            };
+
             // DOM is present, scrape it
+            const cachedPersonnel = this.currentInputs.personnel || [];
+            const cachedDetailedOpex = this.currentInputs.detailedOpex || [];
             this.currentInputs = {
-                capacity: parseFloat(document.getElementById('capacity').value) || 0,
-                projectYears: parseInt(document.getElementById('projectYears').value) || 25,
-                powerFactor: parseFloat(document.getElementById('powerFactor').value) || 1,
-                hoursPerDay: parseFloat(document.getElementById('hoursPerDay').value) || 24,
-                degradation: parseFloat(document.getElementById('degradation').value) || 0,
+                capacity: getValue('capacity'),
+                projectYears: getValue('projectYears') || 25, // default if 0
+                powerFactor: getValue('powerFactor'),
+                hoursPerDay: getValue('hoursPerDay'),
+                daysPerYear: getValue('daysPerYear') || 365,
+                degradation: getValue('degradation'),
 
                 revenue: {
-                    peakRate: parseFloat(document.getElementById('pricePeak').value) || 0,
-                    peakHours: parseFloat(document.getElementById('hoursPeak').value) || 0,
-                    offPeakRate: parseFloat(document.getElementById('priceOffPeak').value) || 0,
-                    escalation: parseFloat(document.getElementById('revenueEscalation').value) || 0,
-                    adderPrice: parseFloat(document.getElementById('adderPrice').value) || 0,
-                    adderYears: parseFloat(document.getElementById('adderYears').value) || 0,
+                    peakRate: getValue('pricePeak'),
+                    peakHours: getValue('hoursPeak'),
+                    offPeakRate: getValue('priceOffPeak'),
+                    escalation: getValue('revenueEscalation'),
+                    adderPrice: getValue('adderPrice'),
+                    adderYears: getValue('adderYears'),
                 },
 
                 capex: {
-                    construction: (parseFloat(document.getElementById('costConstruction').value) || 0) * 1000000,
-                    machinery: (parseFloat(document.getElementById('costMachinery').value) || 0) * 1000000,
-                    land: (parseFloat(document.getElementById('costLand').value) || 0) * 1000000
+                    construction: getValue('costConstruction') * 1000000,
+                    machinery: getValue('costMachinery') * 1000000,
+                    land: getValue('costLand') * 1000000,
+                    sharePremium: getValue('costSharePremium') * 1000000,
+                    others: getValue('costOthers') * 1000000
                 },
 
                 finance: {
-                    debtRatio: parseFloat(document.getElementById('debtRatio').value) || 0,
-                    interestRate: parseFloat(document.getElementById('interestRate').value) || 0,
-                    loanTerm: parseInt(document.getElementById('loanTerm').value) || 0,
-                    taxRate: parseFloat(document.getElementById('taxRate').value) || 0,
-                    opexInflation: parseFloat(document.getElementById('opexInflation').value) || 0,
-                    taxHoliday: parseInt(document.getElementById('taxHoliday').value) || 0
-                }
+                    debtRatio: getValue('debtRatio'),
+                    interestRate: getValue('interestRate'),
+                    loanTerm: getValue('loanTerm'),
+                    taxRate: getValue('taxRate'),
+                    opexInflation: getValue('opexInflation'),
+                    taxHoliday: getValue('taxHoliday')
+                },
+
+                personnel: cachedPersonnel,
+                detailedOpex: cachedDetailedOpex
             };
         }
 
@@ -367,7 +466,9 @@ class InputManager {
             ...inputs,
             revenue: { ...this.currentInputs.revenue, ...(inputs.revenue || {}) },
             capex: { ...this.currentInputs.capex, ...(inputs.capex || {}) },
-            finance: { ...this.currentInputs.finance, ...(inputs.finance || {}) }
+            finance: { ...this.currentInputs.finance, ...(inputs.finance || {}) },
+            personnel: inputs.personnel || this.currentInputs.personnel || [],
+            detailedOpex: inputs.detailedOpex || this.currentInputs.detailedOpex || []
         };
 
         // Sync OPEX
@@ -423,7 +524,8 @@ class InputManager {
         const discountRate = 0.07;
 
         // Finance Params
-        const totalCapex = inputs.capex.construction + inputs.capex.machinery + inputs.capex.land;
+        // Finance Params
+        const totalCapex = inputs.capex.construction + inputs.capex.machinery + inputs.capex.land + (inputs.capex.sharePremium || 0) + (inputs.capex.others || 0);
         const debtRatio = (inputs.finance.debtRatio || 0) / 100;
         const loanAmount = totalCapex * debtRatio;
         const equityAmount = totalCapex - loanAmount;
@@ -443,17 +545,20 @@ class InputManager {
         const adderYears = inputs.revenue.adderYears || 0;
 
         // Depreciation (Straight Line)
-        const depreciableAsset = inputs.capex.construction + inputs.capex.machinery;
+        // Land and Share Premium are NOT depreciable.
+        // Construction, Machinery, and Others ARE depreciable.
+        const depreciableAsset = inputs.capex.construction + inputs.capex.machinery + (inputs.capex.others || 0);
         const annualDepreciation = depreciableAsset / projectYears;
 
         // --- 2. Calculate Annual Revenue ---
         const capacityKW = inputs.capacity * 1000;
         const dailyEnergyPeak = capacityKW * (inputs.revenue.peakHours * inputs.powerFactor);
         const dailyEnergyOffPeak = capacityKW * ((inputs.hoursPerDay - inputs.revenue.peakHours) * inputs.powerFactor);
-        const totalAnnualEnergy = (dailyEnergyPeak + dailyEnergyOffPeak) * 365;
+        const days = inputs.daysPerYear || 365;
+        const totalAnnualEnergy = (dailyEnergyPeak + dailyEnergyOffPeak) * days;
 
-        const annualGenPeak = dailyEnergyPeak * 365;
-        const annualGenOffPeak = dailyEnergyOffPeak * 365;
+        const annualGenPeak = dailyEnergyPeak * days;
+        const annualGenOffPeak = dailyEnergyOffPeak * days;
         const baseAnnualRevenue = (annualGenPeak * inputs.revenue.peakRate) + (annualGenOffPeak * inputs.revenue.offPeakRate);
 
         // --- 4. Generate Cash Flow Array ---
@@ -504,21 +609,112 @@ class InputManager {
             let yearItemized = {};
 
             inputs.opex.forEach(item => {
-                let isDue = false;
-                if (item.frequency === 1) isDue = true;
-                else if (year % item.frequency === 0) isDue = true;
+                let multiplier = 0;
+                const fType = item.freqType || 'yearly';
+
+                // Determine if active and multiplier based on frequency
+                if (fType === 'daily') {
+                    multiplier = inputs.daysPerYear || 365;
+                } else if (fType === 'monthly') {
+                    multiplier = 12;
+                } else if (fType === 'yearly') {
+                    multiplier = 1;
+                } else if (fType === 'every_n') {
+                    const n = parseInt(item.customN) || 5;
+                    if (year % n === 0) multiplier = 1;
+                } else if (fType === 'period') {
+                    const s = parseInt(item.startYear) || 1;
+                    const e = parseInt(item.endYear) || projectYears;
+                    if (year >= s && year <= e) multiplier = 1;
+                } else {
+                    // Fallback legacy
+                    const oldFreq = item.frequency || 1;
+                    if (oldFreq === 1 || year % oldFreq === 0) multiplier = 1;
+                }
 
                 let cost = 0;
-                if (isDue) {
-                    if (item.type === 'fixed') cost = item.value;
-                    else if (item.type === 'per_mw') cost = item.value * inputs.capacity;
-                    else if (item.type === 'percent_capex') cost = (item.value / 100) * totalCapex;
-                    cost = cost * inflationFactor;
+                if (multiplier > 0) {
+                    const qty = parseFloat(item.quantity) || 1;
+                    let baseCost = 0;
+                    if (item.type === 'fixed') baseCost = item.value;
+                    else if (item.type === 'per_mw') baseCost = item.value * inputs.capacity;
+                    else if (item.type === 'percent_capex') baseCost = (item.value / 100) * totalCapex;
+                    else if (item.type === 'percent_machinery') baseCost = (item.value / 100) * (inputs.capex.machinery || 0);
+                    else if (item.type === 'percent_const_mach') baseCost = (item.value / 100) * ((inputs.capex.construction || 0) + (inputs.capex.machinery || 0));
+
+                    // Apply quantity to unit price
+                    baseCost *= qty;
+
+                    cost = baseCost * multiplier * inflationFactor;
                 }
 
                 yearOpex += cost;
-                yearItemized[item.name] = cost;
+                yearItemized[item.name] = (yearItemized[item.name] || 0) + cost;
             });
+
+            // --- Personnel Costs ---
+            if (inputs.personnel && Array.isArray(inputs.personnel)) {
+                let totalPersonnel = 0;
+                inputs.personnel.forEach(job => {
+                    const count = parseFloat(job.count) || 0;
+                    if (count > 0) {
+                        const salary = parseFloat(job.salary) || 0;
+                        const bonus = parseFloat(job.bonus) || 0;
+                        const increase = parseFloat(job.increase) || 0;
+
+                        const annualPerHead = (salary * 12) + (salary * bonus);
+                        const growthFactor = Math.pow(1 + (increase / 100), year - 1);
+
+                        const totalJobCost = annualPerHead * count * growthFactor;
+
+                        yearOpex += totalJobCost;
+                        totalPersonnel += totalJobCost;
+                    }
+                });
+                if (totalPersonnel > 0) {
+                    yearItemized['Personnel Expenses'] = totalPersonnel;
+                }
+            }
+
+            // --- Detailed Variable OPEX ---
+            if (inputs.detailedOpex && Array.isArray(inputs.detailedOpex)) {
+                // Dependency Resolver
+                const getDetQty = (item, depth = 0) => {
+                    if (depth > 5) return 0;
+                    if (item.mode === 'linked' && item.linkedSourceId) {
+                        const source = inputs.detailedOpex.find(i => i.id === item.linkedSourceId);
+                        if (source) {
+                            return getDetQty(source, depth + 1) * ((parseFloat(item.multiplier) || 0) / 100);
+                        }
+                    }
+                    return parseFloat(item.quantity) || 0;
+                };
+
+                inputs.detailedOpex.forEach(item => {
+                    const price = parseFloat(item.price) || 0;
+                    const qty = getDetQty(item);
+
+                    // Frequency Logic
+                    let fType = item.freqType;
+                    // If linked, inherit frequency from source (since UI hides it)
+                    if (item.mode === 'linked' && item.linkedSourceId) {
+                        const source = inputs.detailedOpex.find(i => i.id === item.linkedSourceId);
+                        if (source) fType = source.freqType;
+                    }
+
+                    let freqMultiplier = 1;
+                    if (fType === 'daily') freqMultiplier = (inputs.daysPerYear || 334);
+                    else if (fType === 'monthly') freqMultiplier = 12;
+
+                    const annualCost = qty * price * freqMultiplier * inflationFactor;
+
+                    if (annualCost > 0) {
+                        const catName = item.category || 'Variable Expenses';
+                        yearItemized[catName] = (yearItemized[catName] || 0) + annualCost;
+                        yearOpex += annualCost;
+                    }
+                });
+            }
 
             annualOpex[year] = yearOpex;
             annualItemizedOpex[year] = yearItemized;

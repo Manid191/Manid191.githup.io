@@ -27,7 +27,7 @@ class FinancialManager {
 
         // Helper to generate row
         const row = (label, dataArray, isBold = false, isNegative = false) => {
-            let html = `<td class="${isBold ? 'fw-bold' : ''}">${label}</td>`;
+            let html = `<td class="${isBold ? 'fw-bold' : ''}" style="white-space: nowrap;">${label}</td>`;
             for (let i = 1; i <= years; i++) {
                 const val = dataArray[i] || 0;
                 let displayVal = this.formatNumber(val);
@@ -57,6 +57,7 @@ class FinancialManager {
                         <tbody>
                             ${row('Revenue', d.annualRevenue, true)}
                             ${row('(-) OPEX', d.annualOpex, false, true)}
+                            ${this.generateItemizedOpexRows(d, years, row)}
                             <tr class="table-header" style="background:#f0f0f0;">
                                 <td class="fw-bold">EBITDA</td>
                                 ${this.generateRowCells(d.annualEbitda)}
@@ -101,11 +102,38 @@ class FinancialManager {
     generateRowCells(dataArray) {
         // Assumes dataArray is 0-indexed where index 0 is year 0 (which we compare or skip depending on requirements)
         // Here we render index 1 to End
-        // We need to know length? We can guess from dataArray length
         let html = '';
         for (let i = 1; i < dataArray.length; i++) {
             html += `<td class="text-end fw-bold">${this.formatNumber(dataArray[i])}</td>`;
         }
+        return html;
+    }
+
+    generateItemizedOpexRows(details, years, rowHelper) {
+        if (!details.annualItemizedOpex) return '';
+
+        // 1. Get all unique item names
+        const itemNames = new Set();
+        details.annualItemizedOpex.forEach(yearObj => {
+            if (yearObj) {
+                Object.keys(yearObj).forEach(k => itemNames.add(k));
+            }
+        });
+
+        // 2. Generate rows
+        let html = '';
+        itemNames.forEach(name => {
+            // Build data array for this item
+            const dataArray = new Array(years + 1).fill(0);
+            for (let i = 1; i <= years; i++) {
+                if (details.annualItemizedOpex[i] && details.annualItemizedOpex[i][name]) {
+                    dataArray[i] = details.annualItemizedOpex[i][name];
+                }
+            }
+            // Use rowHelper to format. Indent name.
+            // Pass isNegative=true to show (val)
+            html += rowHelper(`&nbsp;&nbsp;&nbsp;- ${name}`, dataArray, false, true);
+        });
         return html;
     }
 

@@ -36,6 +36,14 @@
                     <i class="fa-solid fa-sliders"></i>
                     <span>Parameters</span>
                 </a>
+                <a href="#" class="nav-item" data-view="personnel">
+                    <i class="fa-solid fa-users"></i>
+                    <span>Personnel</span>
+                </a>
+                <a href="#" class="nav-item" data-view="detailed-opex">
+                    <i class="fa-solid fa-flask"></i>
+                    <span>Detailed OPEX</span>
+                </a>
                 <a href="#" class="nav-item" data-view="financials">
                     <i class="fa-solid fa-file-invoice-dollar"></i>
                     <span>Financials</span>
@@ -48,10 +56,12 @@
 
             <div class="nav-actions">
                 <div class="project-controls">
-                    <button class="btn btn-sm btn-primary" onclick="window.inputApps && window.inputApps.resetToDefaults()">
+                    <button class="btn btn-sm btn-primary"
+                        onclick="window.inputApps && window.inputApps.resetToDefaults()">
                         <i class="fa-solid fa-plus"></i> New
                     </button>
-                    <button class="btn btn-sm btn-secondary" onclick="window.inputApps && window.inputApps.exportScenario()">
+                    <button class="btn btn-sm btn-secondary"
+                        onclick="window.inputApps && window.inputApps.exportScenario()">
                         <i class="fa-solid fa-download"></i> Export
                     </button>
                     <button class="btn btn-sm btn-secondary" onclick="document.getElementById('topImportFile').click()">
@@ -93,6 +103,8 @@
     <script src="input_manager.js"></script>
     <script src="dashboard.js?v=1.1"></script>
     <script src="report_manager.js?v=1.1"></script>
+    <script src="personnel_manager.js"></script>
+    <script src="detailed_opex_manager.js"></script>
     <script src="financial_manager.js?v=1.1"></script>
     <script src="test_runner.js?v=1.1"></script>
     <script src="app.js?v=1.1"></script>

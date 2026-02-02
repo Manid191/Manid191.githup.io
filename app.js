@@ -91,6 +91,14 @@ document.addEventListener('DOMContentLoaded', () => {
                     window.inputApps.setState(latest);
                 }
 
+            } else if (viewName === 'personnel') {
+                if (window.personnelApp) {
+                    window.personnelApp.render();
+                }
+            } else if (viewName === 'detailed-opex') {
+                if (window.detailedOpexApp) {
+                    window.detailedOpexApp.render();
+                }
             } else if (viewName === 'dashboard') {
                 if (!window.hasCalculated) {
                     document.getElementById('content-area').innerHTML = `<div class="placeholder-state">
@@ -163,6 +171,9 @@ function updateHeader(viewName) {
     const titleMap = {
         'dashboard': { title: 'Dashboard', sub: 'Overview of your power plant feasibility study' },
         'inputs': { title: 'Parameters', sub: 'Configure technical and financial assumptions' },
+        'inputs': { title: 'Parameters', sub: 'Configure technical and financial assumptions' },
+        'personnel': { title: 'Personnel Plan', sub: 'Manage headcount and salary costs' },
+        'detailed-opex': { title: 'Variable Costs', sub: 'Manage Detailed OPEX (Chemicals, Maintenance, etc.)' },
         'financials': { title: 'Financial Models', sub: 'Detailed cash flow and ratios' },
         'report': { title: 'Report', sub: 'Generate and export PDF reports' }
     };
