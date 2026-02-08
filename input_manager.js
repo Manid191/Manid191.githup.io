@@ -27,41 +27,47 @@ class InputManager {
             opexItems: JSON.parse(JSON.stringify(initialOpex))
         };
         this.lastResults = null;
+
+        // Initialize Strategies
+        this.strategies = {
+            POWER: new PowerModel(),
+            SOLAR: new PowerModel(), // Solar uses same logic as Power for now
+            WATER: new WaterModel(),
+            WASTE: new WasteModel()
+        };
     }
 
     renderInputs() {
         const fmt = (v) => (Number(v) || 0).toLocaleString('en-US', { maximumFractionDigits: 2 });
+
+        // 1. Determine Model Config
+        const modelType = this.currentInputs.modelType || 'POWER';
+        const modelConfig = window.AppConfig.models[modelType] || window.AppConfig.models.POWER;
+        const labels = modelConfig.labels;
+        const units = modelConfig.units;
 
         this.container.innerHTML = `
             <div class="three-column-layout">
                 
                 <!-- 1. Technical & Revenue -->
                 <div class="card glass-panel col-item">
-                    <h3><i class="fa-solid fa-bolt"></i> Technical & Revenue</h3>
+                    <h3><i class="fa-solid ${modelConfig.icon}"></i> ${modelConfig.name} Parameters</h3>
                     
                     <div class="row">
                         <div class="form-group">
-                            <label>Production Cap (MW)</label>
-                            <input type="text" id="productionCapacity" value="${fmt(this.currentInputs.productionCapacity || this.currentInputs.capacity)}" onchange="inputApps.evaluateMathInput(this)">
-                        </div>
-                        <div class="form-group">
-                            <label>Sales Cap (MW)</label>
+                            <label>${labels.capacity}</label>
                             <input type="text" id="capacity" value="${fmt(this.currentInputs.capacity)}" onchange="inputApps.evaluateMathInput(this)">
                         </div>
                         <div class="form-group">
-                            <label>Duration (Yrs)</label>
-                            <input type="text" id="projectYears" value="${fmt(this.currentInputs.projectYears)}" onchange="inputApps.evaluateMathInput(this)">
+                            <label>Efficiency / Loss (%)</label>
+                             <input type="text" id="degradation" value="${fmt(this.currentInputs.degradation || this.currentInputs.revenue.lossRate || 0)}" onchange="inputApps.evaluateMathInput(this)">
                         </div>
                     </div>
 
                     <div class="row">
-                        <div class="form-group">
-                            <label>Power Factor</label>
-                            <input type="text" id="powerFactor" value="${fmt(this.currentInputs.powerFactor)}" onchange="inputApps.evaluateMathInput(this)">
-                        </div>
-                        <div class="form-group">
-                            <label>Hrs/Day</label>
-                            <input type="text" id="hoursPerDay" value="${fmt(this.currentInputs.hoursPerDay)}" onchange="inputApps.evaluateMathInput(this)">
+                         <div class="form-group">
+                            <label>Duration (Yrs)</label>
+                            <input type="text" id="projectYears" value="${fmt(this.currentInputs.projectYears)}" onchange="inputApps.evaluateMathInput(this)">
                         </div>
                         <div class="form-group">
                             <label>Days/Yr</label>
@@ -69,45 +75,18 @@ class InputManager {
                         </div>
                     </div>
                     
-                    <div class="form-group">
-                        <label>Degradation (%)</label>
-                        <input type="text" id="degradation" value="${fmt(this.currentInputs.degradation || 0)}" onchange="inputApps.evaluateMathInput(this)">
-                    </div>
-
-                    <div class="divider"></div>
-                    
                     <div class="row">
                         <div class="form-group">
-                            <label>Peak Rate</label>
-                            <input type="text" id="pricePeak" value="${fmt(this.currentInputs.revenue.peakRate)}" onchange="inputApps.evaluateMathInput(this)">
+                            <label>Power Factor</label>
+                            <input type="text" id="powerFactor" value="${fmt(this.currentInputs.powerFactor || 0.90)}" step="0.01" onchange="inputApps.evaluateMathInput(this)">
                         </div>
                         <div class="form-group">
-                            <label>Peak Hrs</label>
-                            <input type="text" id="hoursPeak" value="${fmt(this.currentInputs.revenue.peakHours)}" onchange="inputApps.evaluateMathInput(this)">
-                        </div>
-                    </div>
-
-                    <div class="row">
-                        <div class="form-group">
-                            <label>Off-Peak Rate</label>
-                            <input type="text" id="priceOffPeak" value="${fmt(this.currentInputs.revenue.offPeakRate)}" onchange="inputApps.evaluateMathInput(this)">
-                        </div>
-                        <div class="form-group">
-                            <label>Escalation %</label>
-                            <input type="text" id="revenueEscalation" value="${fmt(this.currentInputs.revenue.escalation)}" onchange="inputApps.evaluateMathInput(this)">
+                            <label>Rev Escalation %</label>
+                            <input type="text" id="revenueEscalation" value="${fmt(this.currentInputs.revenue.escalation || 0)}" step="0.1" onchange="inputApps.evaluateMathInput(this)">
                         </div>
                     </div>
                     
-                    <div class="row">
-                        <div class="form-group">
-                            <label>Adder</label>
-                            <input type="text" id="adderPrice" value="${fmt(this.currentInputs.revenue.adderPrice || 0)}" onchange="inputApps.evaluateMathInput(this)">
-                        </div>
-                        <div class="form-group">
-                            <label>Adder Yrs</label>
-                            <input type="text" id="adderYears" value="${fmt(this.currentInputs.revenue.adderYears || 0)}" onchange="inputApps.evaluateMathInput(this)">
-                        </div>
-                    </div>
+                    ${this.renderRevenueInputs(modelType, fmt)}
                 </div>
 
                 <!-- 2. CAPEX (Investment) -->
@@ -143,6 +122,19 @@ class InputManager {
                         <span>Total:</span>
                         <span id="totalCapex" class="highlight">0 M</span>
                     </div>
+
+                     <!-- Additional Revenue Streams (Small Section) -->
+                    <div class="divider"></div>
+                    <div class="card-header" style="margin-bottom: 5px;">
+                        <h4 style="margin:0;"><i class="fa-solid fa-hand-holding-dollar"></i> Other Revenue</h4>
+                        <button class="btn btn-primary btn-sm" onclick="inputApps.addOtherRevenueItem()">
+                            <i class="fa-solid fa-plus"></i> Add
+                        </button>
+                    </div>
+                    <div id="other-revenue-list" class="opex-container" style="max-height: 150px; overflow-y: auto;">
+                        <!-- Items injected here -->
+                    </div>
+
                 </div>
 
                 <!-- 3. Financial Structure -->
@@ -215,7 +207,71 @@ class InputManager {
 
         this.updateCapexTotal();
         this.renderOpexList();
+        this.renderOtherRevenueList();
         this.attachListeners();
+    }
+
+    renderRevenueInputs(modelType, fmt) {
+        let html = '<div class="divider"></div>';
+
+        if (modelType === 'POWER' || modelType === 'SOLAR') {
+            html += `
+                <div class="row">
+                    <div class="form-group">
+                        <label>Peak Rate (THB)</label>
+                        <input type="text" id="pricePeak" value="${fmt(this.currentInputs.revenue.peakRate)}" onchange="inputApps.evaluateMathInput(this)">
+                    </div>
+                    <div class="form-group">
+                        <label>Peak Hrs/Day</label>
+                        <input type="text" id="hoursPeak" value="${fmt(this.currentInputs.revenue.peakHours)}" onchange="inputApps.evaluateMathInput(this)">
+                    </div>
+                </div>
+                <div class="row">
+                    <div class="form-group">
+                        <label>Off-Peak Rate</label>
+                        <input type="text" id="priceOffPeak" value="${fmt(this.currentInputs.revenue.offPeakRate)}" onchange="inputApps.evaluateMathInput(this)">
+                    </div>
+                    <div class="form-group">
+                        <label>Hrs/Day</label>
+                        <input type="text" id="hoursPerDay" value="${fmt(this.currentInputs.hoursPerDay)}" onchange="inputApps.evaluateMathInput(this)">
+                    </div>
+                </div>
+                 <div class="row">
+                    <div class="form-group">
+                        <label>Adder (THB)</label>
+                        <input type="text" id="adderPrice" value="${fmt(this.currentInputs.revenue.adderPrice || 0)}" onchange="inputApps.evaluateMathInput(this)">
+                    </div>
+                    <div class="form-group">
+                        <label>Adder Yrs</label>
+                        <input type="text" id="adderYears" value="${fmt(this.currentInputs.revenue.adderYears || 0)}" onchange="inputApps.evaluateMathInput(this)">
+                    </div>
+                </div>
+            `;
+        } else if (modelType === 'WATER') {
+            html += `
+                 <div class="form-group">
+                    <label>Unit Price (THB/m³)</label>
+                    <input type="text" id="unitPrice" value="${fmt(this.currentInputs.revenue.unitPrice)}" onchange="inputApps.evaluateMathInput(this)">
+                </div>
+            `;
+        } else if (modelType === 'WASTE') {
+            html += `
+                 <div class="form-group">
+                    <label>Tipping Fee (THB/Ton)</label>
+                    <input type="text" id="tippingFee" value="${fmt(this.currentInputs.revenue.tippingFee)}" onchange="inputApps.evaluateMathInput(this)">
+                </div>
+            `;
+        }
+
+        // Common Escalation
+        html += `
+            <div class="form-group">
+                <label>Price Escalation %</label>
+                <input type="text" id="revenueEscalation" value="${fmt(this.currentInputs.revenue.escalation)}" onchange="inputApps.evaluateMathInput(this)">
+            </div>
+        `;
+
+        return html;
     }
 
     resetToDefaults() {
@@ -414,6 +470,7 @@ class InputManager {
             const cachedPersonnel = this.currentInputs.personnel || [];
             const cachedDetailedOpex = this.currentInputs.detailedOpex || [];
             this.currentInputs = {
+                modelType: this.currentInputs.modelType || 'POWER', // PRESERVE MODEL TYPE
                 productionCapacity: getValue('productionCapacity') || getValue('capacity'),
                 capacity: getValue('capacity'),
                 projectYears: getValue('projectYears') || 25, // default if 0
@@ -429,6 +486,11 @@ class InputManager {
                     escalation: getValue('revenueEscalation'),
                     adderPrice: getValue('adderPrice'),
                     adderYears: getValue('adderYears'),
+
+                    // Generic
+                    unitPrice: getValue('unitPrice'),
+                    tippingFee: getValue('tippingFee'),
+                    lossRate: getValue('degradation') // reused input id
                 },
 
                 capex: {
@@ -449,7 +511,6 @@ class InputManager {
                 },
 
                 personnel: cachedPersonnel,
-                personnel: cachedPersonnel,
                 personnelWelfarePercent: getValue('personnelWelfarePercent') || 0,
                 detailedOpex: cachedDetailedOpex
             };
@@ -465,8 +526,70 @@ class InputManager {
                 sharePremium: (this.currentInputs.capex.sharePremium || 0) * 1000000,
                 others: (this.currentInputs.capex.others || 0) * 1000000
             },
-            opex: this.state.opexItems
+            opex: this.state.opexItems,
+            otherRevenue: this.currentInputs.otherRevenue || []
         };
+    }
+
+    // --- Other Revenue Management ---
+    renderOtherRevenueList() {
+        const list = document.getElementById('other-revenue-list');
+        if (!list) return;
+        list.innerHTML = '';
+
+        const items = this.currentInputs.otherRevenue || [];
+        items.forEach((item, index) => {
+            const html = `
+                <div class="opex-item compact-row">
+                    <input type="text" class="input-compact grow-2" placeholder="Description (e.g. Carbon Credit)" 
+                           value="${item.name}" onchange="inputApps.updateOtherRevenue(${index}, 'name', this.value)">
+                    
+                    <select class="input-compact grow-1" onchange="inputApps.updateOtherRevenue(${index}, 'freqType', this.value)">
+                        <option value="yearly" ${item.freqType === 'yearly' ? 'selected' : ''}>Yearly (Fixed)</option>
+                        <option value="monthly" ${item.freqType === 'monthly' ? 'selected' : ''}>Monthly</option>
+                        <option value="per_unit" ${item.freqType === 'per_unit' ? 'selected' : ''}>Per Output Unit</option>
+                    </select>
+
+                    <input type="text" class="input-compact grow-1" placeholder="Amount" 
+                           value="${(parseFloat(item.amount) || 0).toLocaleString('en-US', { maximumFractionDigits: 2 })}" 
+                           onchange="inputApps.updateOtherRevenue(${index}, 'amount', this.value)">
+
+                    <input type="number" class="input-compact" style="width: 60px;" placeholder="Esc%" 
+                           value="${item.escalation || 0}" onchange="inputApps.updateOtherRevenue(${index}, 'escalation', this.value)" title="Escalation %">
+
+                    <button class="btn btn-danger btn-icon btn-sm" onclick="inputApps.removeOtherRevenue(${index})">
+                        <i class="fa-solid fa-times"></i>
+                    </button>
+                </div>
+            `;
+            list.insertAdjacentHTML('beforeend', html);
+        });
+    }
+
+    addOtherRevenueItem() {
+        if (!this.currentInputs.otherRevenue) this.currentInputs.otherRevenue = [];
+        this.currentInputs.otherRevenue.push({
+            id: Date.now(),
+            name: '',
+            freqType: 'yearly',
+            amount: 0,
+            escalation: 0
+        });
+        this.renderOtherRevenueList();
+    }
+
+    removeOtherRevenue(index) {
+        this.currentInputs.otherRevenue.splice(index, 1);
+        this.renderOtherRevenueList();
+    }
+
+    updateOtherRevenue(index, field, value) {
+        if (field === 'amount') {
+            // Handle comma inputs
+            value = parseFloat(value.replace(/,/g, '')) || 0;
+        }
+        this.currentInputs.otherRevenue[index][field] = value;
+        this.renderOtherRevenueList();
     }
 
     setState(data) {
@@ -499,37 +622,48 @@ class InputManager {
         // Sync DOM if exists
         const capEl = document.getElementById('capacity');
         if (capEl) {
-            if (inputs.productionCapacity) document.getElementById('productionCapacity').value = inputs.productionCapacity;
-            if (inputs.capacity) document.getElementById('capacity').value = inputs.capacity;
-            if (inputs.projectYears) document.getElementById('projectYears').value = inputs.projectYears;
-            if (inputs.powerFactor) document.getElementById('powerFactor').value = inputs.powerFactor;
-            if (inputs.hoursPerDay) document.getElementById('hoursPerDay').value = inputs.hoursPerDay;
-            if (inputs.degradation !== undefined) document.getElementById('degradation').value = inputs.degradation;
+            // Helper to safely set value
+            const setVal = (id, val) => {
+                const el = document.getElementById(id);
+                if (el && val !== undefined && val !== null) el.value = val;
+            };
+
+            setVal('productionCapacity', inputs.productionCapacity);
+            setVal('capacity', inputs.capacity);
+            setVal('projectYears', inputs.projectYears);
+            setVal('powerFactor', inputs.powerFactor);
+            setVal('hoursPerDay', inputs.hoursPerDay);
+            setVal('daysPerYear', inputs.daysPerYear);
+            setVal('degradation', inputs.degradation);
 
             if (inputs.revenue) {
-                if (inputs.revenue.peakRate) document.getElementById('pricePeak').value = inputs.revenue.peakRate;
-                if (inputs.revenue.peakHours) document.getElementById('hoursPeak').value = inputs.revenue.peakHours;
-                if (inputs.revenue.offPeakRate) document.getElementById('priceOffPeak').value = inputs.revenue.offPeakRate;
-                if (inputs.revenue.escalation !== undefined) document.getElementById('revenueEscalation').value = inputs.revenue.escalation;
-                if (inputs.revenue.adderPrice !== undefined) document.getElementById('adderPrice').value = inputs.revenue.adderPrice;
-                if (inputs.revenue.adderYears !== undefined) document.getElementById('adderYears').value = inputs.revenue.adderYears;
+                setVal('pricePeak', inputs.revenue.peakRate);
+                setVal('hoursPeak', inputs.revenue.peakHours);
+                setVal('priceOffPeak', inputs.revenue.offPeakRate);
+                setVal('revenueEscalation', inputs.revenue.escalation);
+                setVal('adderPrice', inputs.revenue.adderPrice);
+                setVal('adderYears', inputs.revenue.adderYears);
+                setVal('unitPrice', inputs.revenue.unitPrice);
+                setVal('tippingFee', inputs.revenue.tippingFee);
             }
 
             // CAPEX (Convert back to Millions for display)
             if (inputs.capex) {
-                if (inputs.capex.construction) document.getElementById('costConstruction').value = inputs.capex.construction / 1000000;
-                if (inputs.capex.machinery) document.getElementById('costMachinery').value = inputs.capex.machinery / 1000000;
-                if (inputs.capex.land) document.getElementById('costLand').value = inputs.capex.land / 1000000;
+                setVal('costConstruction', inputs.capex.construction / 1000000);
+                setVal('costMachinery', inputs.capex.machinery / 1000000);
+                setVal('costLand', inputs.capex.land / 1000000);
+                setVal('costSharePremium', inputs.capex.sharePremium ? inputs.capex.sharePremium / 1000000 : 0);
+                setVal('costOthers', inputs.capex.others ? inputs.capex.others / 1000000 : 0);
             }
 
             // Financial
             if (inputs.finance) {
-                if (inputs.finance.debtRatio !== undefined) document.getElementById('debtRatio').value = inputs.finance.debtRatio;
-                if (inputs.finance.interestRate !== undefined) document.getElementById('interestRate').value = inputs.finance.interestRate;
-                if (inputs.finance.loanTerm) document.getElementById('loanTerm').value = inputs.finance.loanTerm;
-                if (inputs.finance.taxRate !== undefined) document.getElementById('taxRate').value = inputs.finance.taxRate;
-                if (inputs.finance.opexInflation !== undefined) document.getElementById('opexInflation').value = inputs.finance.opexInflation;
-                if (inputs.finance.taxHoliday !== undefined) document.getElementById('taxHoliday').value = inputs.finance.taxHoliday;
+                setVal('debtRatio', inputs.finance.debtRatio);
+                setVal('interestRate', inputs.finance.interestRate);
+                setVal('loanTerm', inputs.finance.loanTerm);
+                setVal('taxRate', inputs.finance.taxRate);
+                setVal('opexInflation', inputs.finance.opexInflation);
+                setVal('taxHoliday', inputs.finance.taxHoliday);
             }
 
             this.renderOpexList();
@@ -656,28 +790,51 @@ class InputManager {
             // --- Recalculate Revenue with Simulation Params ---
             const escalationFactor = Math.pow(1 + revenueEscalation, year - 1);
             const inflationFactor = Math.pow(1 + opexInflation, year - 1);
+
+            // Degradation applies to Output/Efficiency
             const degradationFactor = Math.pow(1 - degradationRate, year - 1);
             const personnelMultiplier = 1 + ((inputs.personnelWelfarePercent || 0) / 100);
 
-            // Energy Gen
-            const simCapKW = simCapacity * 1000;
-            const dailyGenPeak = simCapKW * (inputs.revenue.peakHours * inputs.powerFactor);
-            const dailyGenOffPeak = simCapKW * ((inputs.hoursPerDay - inputs.revenue.peakHours) * inputs.powerFactor);
-            const yearTotalEnergy = (dailyGenPeak + dailyGenOffPeak) * days;
+            // Determine Model Logic
+            const modelType = inputs.modelType || 'POWER';
 
-            // Base Revenue (Corrected for Degradation & Escalation)
-            // Note: Escalation applies to PRICE, Degradation applies to ENERGY
-            const yearPricePeak = simPricePeak * escalationFactor;
-            const yearPriceOffPeak = simPriceOffPeak * escalationFactor;
+            // Strategy Execution
+            const strategy = this.strategies[modelType] || this.strategies['POWER'];
+            const revParams = {
+                degradationFactor,
+                escalationFactor,
+                days,
+                simCapacity,
+                simPricePeak,
+                simPriceOffPeak
+            };
 
-            const yearGenPeak = dailyGenPeak * days * degradationFactor;
-            const yearGenOffPeak = dailyGenOffPeak * days * degradationFactor;
+            const { revenue: yearBaseRevenue, totalEnergy: yearTotalEnergy } = strategy.calculateRevenue(inputs, year, revParams);
 
-            const yearBaseRevenue = (yearGenPeak * yearPricePeak) + (yearGenOffPeak * yearPriceOffPeak);
+            // --- Additional Revenue Streams ---
+            let yearOtherRevenue = 0;
+            if (inputs.otherRevenue && Array.isArray(inputs.otherRevenue)) {
+                inputs.otherRevenue.forEach(item => {
+                    const fType = item.freqType || 'yearly';
+                    let multiplier = 0;
 
-            // Adder Logic
-            const yearAdderRevenue = (year <= adderYears) ? (yearTotalEnergy * degradationFactor * adderPrice) : 0;
-            const yearRevenue = yearBaseRevenue + yearAdderRevenue;
+                    // Frequency Check
+                    if (fType === 'yearly') multiplier = 1;
+                    else if (fType === 'monthly') multiplier = 12;
+                    else if (fType === 'daily') multiplier = inputs.daysPerYear || 365;
+                    else if (fType === 'per_unit') multiplier = yearTotalEnergy; // e.g. Carbon Credit per unit
+
+                    if (multiplier > 0) {
+                        const price = parseFloat(item.amount) || 0;
+                        const esc = (parseFloat(item.escalation) || 0) / 100;
+                        const itemEscalation = Math.pow(1 + esc, year - 1);
+
+                        yearOtherRevenue += (price * multiplier * itemEscalation);
+                    }
+                });
+            }
+
+            const yearRevenue = yearBaseRevenue + yearOtherRevenue;
 
             annualRevenue[year] = yearRevenue;
 
@@ -1017,8 +1174,23 @@ class InputManager {
             try {
                 const data = JSON.parse(e.target.result);
                 if (data && data.inputs) {
+                    // Legacy Support: Default to POWER if modelType is missing
+                    if (!data.inputs.modelType) {
+                        data.inputs.modelType = 'POWER';
+                    }
+
+                    // 1. Update State
                     this.setState({ inputs: data.inputs });
+
+                    // 2. Re-render generic inputs to match model (Critical for switching Power <-> Water)
+                    this.renderInputs();
+
+                    // 3. Populate values into the new DOM
+                    this.setState({ inputs: data.inputs });
+
                     alert('Scenario imported successfully!');
+
+                    // 4. Calculate
                     this.userTriggerCalculate();
                 } else {
                     alert('Invalid scenario file format.');

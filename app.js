@@ -16,13 +16,21 @@ document.addEventListener('DOMContentLoaded', () => {
     // Flag to track if user has calculated
     window.hasCalculated = false;
 
-    // --- Clear any saved data to start fresh (User Preference) ---
-    // Double ensure nothing lingers if version match but user wants fresh start
-    // StorageManager.deleteAllSaves(); // Redundant if we rely on versioning, but safe.
+    // --- Startup Logic ---
+    const savedProject = StorageManager.loadLatestProject();
 
-    // Initial View with default values from config
-    // Initial View with default values from config
-    window.inputApps.renderInputs();
+    if (savedProject) {
+        // Load existing project
+        window.inputApps.setState(savedProject);
+        // window.inputApps.renderInputs(); // setState calls renderOpex, but maybe not renderInputs in full? 
+        // Actually setState calls renderOpexList, but renderInputs is needed to build the DOM first.
+        window.inputApps.renderInputs();
+        window.inputApps.setState(savedProject); // Call again to populate DOM
+    } else {
+        // No project found - Show Selection Modal
+        window.inputApps.renderInputs(); // Render default (empty/power) behind modal
+        document.getElementById('modal-starter').style.display = 'flex';
+    }
 
     // Initialize Simulation Manager
     if (typeof SimulationManager !== 'undefined') {
@@ -221,3 +229,60 @@ function updateHeader(viewName) {
         subtitle.textContent = titleMap[viewName].sub;
     }
 }
+
+// Global App Actions
+window.app = {
+    createNewProject: (modelType) => {
+        try {
+            console.log('Creating new project:', modelType);
+            // alert('Debug: Starting createNewProject for ' + modelType); // Uncomment if needed
+
+            if (!window.inputApps) {
+                throw new Error('InputManager (window.inputApps) is not initialized');
+            }
+
+            // 1. Get Base Defaults
+            const config = window.AppConfig;
+            if (!config) throw new Error('AppConfig not found');
+
+            let defaults = JSON.parse(JSON.stringify(config.defaults));
+
+            // 2. Merge Model-Specific Defaults
+            defaults.modelType = modelType;
+            const modelConfig = config.models[modelType];
+            if (modelConfig && modelConfig.defaults) {
+                Object.assign(defaults, modelConfig.defaults);
+                if (modelConfig.defaults.revenue) {
+                    defaults.revenue = { ...defaults.revenue, ...modelConfig.defaults.revenue };
+                }
+            }
+
+            // 3. Set State
+            window.inputApps.setState({ inputs: defaults });
+
+            // 4. Render
+            window.inputApps.renderInputs();
+            window.inputApps.setState({ inputs: defaults }); // Populate
+
+            // 5. Close Modal
+            const modal = document.getElementById('modal-starter');
+            if (modal) modal.style.display = 'none';
+
+            // 6. Save immediately to persist choice
+            const state = {
+                view: 'inputs',
+                lastModified: new Date().toISOString(),
+                inputs: window.inputApps.getInputs()
+            };
+            StorageManager.saveProject(state);
+
+            // alert('Project Created Successfully!'); 
+
+        } catch (error) {
+            console.error('Create Project Error:', error);
+            alert('Error creating project: ' + error.message + '\n' + error.stack);
+        }
+    }
+};
+
+console.log('App Global Actions Initialized');

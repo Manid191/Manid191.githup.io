@@ -225,6 +225,38 @@ class SimulationManager {
                     </div>
                 </div>
             </div>
+
+            <!-- Detailed Comparison Table (Key Years) -->
+            <div class="card glass-panel" style="margin-top: 20px; width: 100%;">
+                <div class="card-header">
+                    <h4><i class="fa-solid fa-table-columns"></i> Snapshot Comparison (Year 1, 5, 10, 20)</h4>
+                </div>
+                <table class="result-table" style="width: 100%; font-size: 0.9em;">
+                    <thead>
+                        <tr>
+                            <th>Parameter</th>
+                            <th colspan="2" style="text-align: center; border-bottom: 2px solid #ddd;">Year 1</th>
+                            <th colspan="2" style="text-align: center; border-bottom: 2px solid #ddd;">Year 5</th>
+                            <th colspan="2" style="text-align: center; border-bottom: 2px solid #ddd;">Year 10</th>
+                            <th colspan="2" style="text-align: center; border-bottom: 2px solid #ddd;">Year 20</th>
+                        </tr>
+                        <tr>
+                            <th></th>
+                            <th>Base</th><th>Sim</th>
+                            <th>Base</th><th>Sim</th>
+                            <th>Base</th><th>Sim</th>
+                            <th>Base</th><th>Sim</th>
+                        </tr>
+                    </thead>
+                    <tbody>
+                        ${this.renderComparisonRow(base, sim, 'Revenue (M)', 'annualRevenue')}
+                        ${this.renderComparisonRow(base, sim, 'EBITDA (M)', 'annualEbitda')}
+                        ${this.renderComparisonRow(base, sim, 'Net Income (M)', 'annualNetIncome')}
+                        ${this.renderComparisonRow(base, sim, 'DSCR (x)', 'annualDSCR', false)}
+                        ${this.renderComparisonRow(base, sim, 'Cash Flow (M)', 'cashFlowGeneric', true)}
+                    </tbody>
+                </table>
+            </div>
         </div>
         `;
 
@@ -369,5 +401,34 @@ class SimulationManager {
                 options: commonOptions
             });
         }
+    }
+
+    renderComparisonRow(base, sim, label, field, isRoot = false) {
+        const years = [1, 5, 10, 20];
+        const fmt = (v) => isRoot ? (v / 1000000).toFixed(1) : (field.includes('DSCR') ? v.toFixed(2) : (v / 1000000).toFixed(1));
+
+        let html = `<tr><td>${label}</td>`;
+        years.forEach(y => {
+            let bVal = 0;
+            let sVal = 0;
+            if (isRoot) {
+                // If it's a root property like cashFlows array
+                // Map 'cashFlowGeneric' to 'cashFlows'
+                bVal = base.cashFlows[y] || 0;
+                sVal = sim.cashFlows[y] || 0;
+            } else {
+                bVal = base.details[field][y] || 0;
+                sVal = sim.details[field][y] || 0;
+            }
+
+            const diff = sVal - bVal;
+            const color = diff > 0.01 ? 'color:green' : (diff < -0.01 ? 'color:red' : '#666');
+            const icon = diff > 0.01 ? '▲' : (diff < -0.01 ? '▼' : '-');
+
+            html += `<td style="background:#f9f9f9">${fmt(bVal)}</td>
+                     <td style="font-weight:bold; ${color}">${fmt(sVal)} <span style="font-size:0.8em">${icon}</span></td>`;
+        });
+        html += `</tr>`;
+        return html;
     }
 }

@@ -4,7 +4,57 @@
  */
 window.AppConfig = {
     // Increment this to force a hard reset on client browsers
-    appVersion: '4.4',
+    appVersion: '5.2',
+
+    // Business Models & Configurations
+    models: {
+        POWER: {
+            id: 'POWER',
+            name: 'Power Plant',
+            icon: 'fa-bolt',
+            units: { capacity: 'MW', product: 'Electricity' },
+            labels: { capacity: 'Production Capacity (MW)', price: 'd' },
+            defaults: {
+                capacity: 10,
+                revenue: { peakRate: 4.5, offPeakRate: 2.6, adderPrice: 0 }
+            }
+        },
+        SOLAR: {
+            id: 'SOLAR',
+            name: 'Solar Power',
+            icon: 'fa-sun',
+            units: { capacity: 'MWp', product: 'Electricity' },
+            labels: { capacity: 'Installed Capacity (MWp)', price: 'Feed-in Tariff' },
+            defaults: {
+                capacity: 5,
+                hoursPerDay: 4.5, // Sun hours
+                degradation: 0.7, // Higher degradation
+                revenue: { peakRate: 2.2, offPeakRate: 2.2, adderPrice: 0 } // Often flat rate or specific FiT
+            }
+        },
+        WATER: {
+            id: 'WATER',
+            name: 'Water Supply',
+            icon: 'fa-faucet',
+            units: { capacity: 'm³/day', product: 'Water' },
+            labels: { capacity: 'Max Production (m³/day)', price: 'Price per m³' },
+            defaults: {
+                capacity: 5000,
+                revenue: { unitPrice: 15, lossRate: 5 } // 5% loss
+            }
+        },
+        WASTE: {
+            id: 'WASTE',
+            name: 'Waste Disposal',
+            icon: 'fa-trash-can',
+            units: { capacity: 'Ton/day', product: 'Waste' },
+            labels: { capacity: 'Max Intake (Ton/day)', price: 'Tipping Fee (THB/Ton)' },
+            defaults: {
+                capacity: 300,
+                revenue: { tippingFee: 500 }
+            }
+        }
+    },
 
     // UI Strings & Labels
     ui: {
@@ -31,13 +81,24 @@ window.AppConfig = {
         hoursPerDay: 24,
         daysPerYear: 334,
         revenue: {
+            // Power
             peakRate: 4.5,
             peakHours: 13,
             offPeakRate: 2.6,
-            escalation: 0.5,
             adderPrice: 0,
-            adderYears: 7
+            adderYears: 7,
+
+            // Water
+            unitPrice: 15,
+            lossRate: 5,
+
+            // Waste
+            tippingFee: 500,
+
+            // Common
+            escalation: 0.5
         },
+        otherRevenue: [], // For Carbon Credit, By-products
         degradation: 0.5,
         capex: {
             construction: 200,      // 200 M

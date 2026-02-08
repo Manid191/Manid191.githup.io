@@ -70,11 +70,45 @@ class DashboardManager {
                         <canvas id="cashFlowChart"></canvas>
                     </div>
                 </div>
+
+                <!-- New Charts Row -->
+                <div class="row" style="margin-top: 20px;">
+                    <div class="card glass-panel col-item">
+                        <h3><i class="fa-solid fa-chart-pie"></i> Expense Breakdown</h3>
+                        <div class="chart-container" style="height: 300px;">
+                            <canvas id="expenseChart"></canvas>
+                        </div>
+                    </div>
+                    <div class="card glass-panel col-item">
+                        <h3><i class="fa-solid fa-heart-pulse"></i> Financial Health (DSCR)</h3>
+                        <div class="chart-container" style="height: 300px;">
+                            <canvas id="dscrChart"></canvas>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- Detailed Table Section -->
+                <div class="card glass-panel full-width" style="margin-top: 20px;">
+                    <div class="card-header">
+                         <h3><i class="fa-solid fa-table"></i> Detailed Cash Flow</h3>
+                         <button class="btn btn-secondary btn-sm" onclick="document.getElementById('detail-table-wrapper').classList.toggle('hidden')">
+                            Toggle View
+                         </button>
+                    </div>
+                    <div id="detail-table-wrapper" class="hidden" style="overflow-x: auto; margin-top: 10px;">
+                        <div id="detail-table-container"></div>
+                    </div>
+                </div>
             </div>
         `;
 
         // Wait for DOM then render chart
-        requestAnimationFrame(() => this.renderCharts(results));
+        requestAnimationFrame(() => {
+            this.renderCharts(results);
+            this.renderExpenseChart(results);
+            this.renderDSCRChart(results);
+            this.renderDetailTable(results);
+        });
     }
 
     renderCharts(results) {
@@ -219,6 +253,142 @@ class DashboardManager {
             currency: 'THB',
             maximumFractionDigits: 0
         }).format(value);
+    }
+
+    renderExpenseChart(results) {
+        const ctx = document.getElementById('expenseChart').getContext('2d');
+        const avg = (arr) => arr.reduce((a, b) => a + b, 0) / arr.length;
+
+        const fixed = avg(results.details.annualFixedCost);
+        const variable = avg(results.details.annualVariableCost);
+        const finance = avg(results.details.annualFinanceCost);
+        const tax = avg(results.details.annualTax);
+
+        new Chart(ctx, {
+            type: 'doughnut',
+            data: {
+                labels: ['Fixed Opex', 'Variable Opex', 'Finance Cost', 'Corporate Tax'],
+                datasets: [{
+                    data: [fixed, variable, finance, tax],
+                    backgroundColor: [
+                        'rgba(255, 159, 64, 0.7)',
+                        'rgba(153, 102, 255, 0.7)',
+                        'rgba(201, 203, 207, 0.7)',
+                        'rgba(255, 99, 132, 0.7)'
+                    ],
+                    borderColor: [
+                        'rgba(255, 159, 64, 1)',
+                        'rgba(153, 102, 255, 1)',
+                        'rgba(201, 203, 207, 1)',
+                        'rgba(255, 99, 132, 1)'
+                    ],
+                    borderWidth: 1
+                }]
+            },
+            options: {
+                responsive: true,
+                maintainAspectRatio: false,
+                plugins: {
+                    legend: { position: 'right' },
+                    tooltip: {
+                        callbacks: {
+                            label: (context) => {
+                                const val = context.parsed;
+                                const total = context.dataset.data.reduce((a, b) => a + b, 0);
+                                const pct = ((val / total) * 100).toFixed(1) + '%';
+                                return `${context.label}: ${this.formatCurrency(val)} (${pct})`;
+                            }
+                        }
+                    }
+                }
+            }
+        });
+    }
+
+    renderDSCRChart(results) {
+        const ctx = document.getElementById('dscrChart').getContext('2d');
+        const labels = results.cashFlows.map((_, i) => `Year ${i}`);
+        const dscrData = results.details.annualDSCR.slice(1);
+        const dscrLabels = labels.slice(1);
+
+        new Chart(ctx, {
+            type: 'line',
+            data: {
+                labels: dscrLabels,
+                datasets: [{
+                    label: 'DSCR',
+                    data: dscrData,
+                    borderColor: 'rgba(75, 192, 192, 1)',
+                    backgroundColor: 'rgba(75, 192, 192, 0.2)',
+                    fill: true,
+                    tension: 0.3
+                }]
+            },
+            options: {
+                responsive: true,
+                maintainAspectRatio: false,
+                scales: {
+                    y: {
+                        beginAtZero: true,
+                        title: { display: true, text: 'Ratio (x)' }
+                    }
+                },
+                plugins: {
+                    annotation: {
+                        annotations: {
+                            line1: {
+                                type: 'line',
+                                yMin: 1.2,
+                                yMax: 1.2,
+                                borderColor: 'red',
+                                borderWidth: 2,
+                                borderDash: [5, 5],
+                                label: { content: 'Min DSCR (1.2x)', enabled: true }
+                            }
+                        }
+                    }
+                }
+            }
+        });
+    }
+
+    renderDetailTable(results) {
+        const container = document.getElementById('detail-table-container');
+        const years = Array.from({ length: results.inputs.projectYears }, (_, i) => i + 1);
+
+        let html = `<table class="data-table small-text" style="width:100%">
+            <thead>
+                <tr>
+                    <th style="min-width: 120px;">Item</th>
+                    ${years.map(y => `<th>Y${y}</th>`).join('')}
+                </tr>
+            </thead>
+            <tbody>`;
+
+        const addRow = (label, dataArr) => {
+            html += `<tr>
+                <td style="font-weight:bold;">${label}</td>
+                ${years.map(y => {
+                const val = dataArr[y] || 0;
+                return `<td>${(val / 1000000).toLocaleString(undefined, { minimumFractionDigits: 1, maximumFractionDigits: 1 })}</td>`;
+            }).join('')}
+            </tr>`;
+        };
+
+        addRow('Revenue', results.details.annualRevenue);
+        addRow('OpEx (Fixed)', results.details.annualFixedCost);
+        addRow('EBITDA', results.details.annualEbitda);
+        addRow('Net Income', results.details.annualNetIncome);
+        html += `<tr style="background:#f0f0f0; font-weight:bold;">
+                 <td>Free Cash Flow</td>
+                 ${years.map(y => {
+            const val = results.cashFlows[y] || 0;
+            return `<td>${(val / 1000000).toLocaleString(undefined, { minimumFractionDigits: 1, maximumFractionDigits: 1 })}</td>`;
+        }).join('')}
+                 </tr>`;
+
+        html += `</tbody></table>`;
+        container.innerHTML = html;
     }
 }
 
