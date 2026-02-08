@@ -7,7 +7,6 @@ class WaterModel extends ModelStrategy {
         const { degradationFactor, escalationFactor, days } = params;
 
         // Water Logic (Volume * Price - Loss)
-        // Water Logic (Volume * Price - Loss)
         const simCapacity = params.simCapacity !== undefined ? params.simCapacity : inputs.capacity;
         const dailyOutput = simCapacity; // m3/day
         const annualOutput = dailyOutput * days;

@@ -2,6 +2,7 @@ class DashboardManager {
     constructor() {
         this.container = document.getElementById('content-area');
         this.chartInstance = null;
+        this.expenseChartInstance = null;
     }
 
     render(results) {
@@ -73,16 +74,28 @@ class DashboardManager {
 
                 <!-- New Charts Row -->
                 <div class="row" style="margin-top: 20px;">
-                    <div class="card glass-panel col-item">
-                        <h3><i class="fa-solid fa-chart-pie"></i> Expense Breakdown</h3>
-                        <div class="chart-container" style="height: 300px;">
-                            <canvas id="expenseChart"></canvas>
+                    <div class="card glass-panel full-width">
+                        <div class="card-header" style="display: flex; gap: 10px; align-items: center; flex-wrap: wrap;">
+                            <h3 style="margin:0;"><i class="fa-solid fa-chart-pie"></i> Detailed Expense Breakdown</h3>
+                            
+                            <div style="margin-left: auto; display: flex; gap: 10px; align-items: center;">
+                                <label style="font-size: 0.85em;">From:</label>
+                                <input type="number" id="expStartYear" class="input-compact" style="width: 50px;" value="1" min="1">
+                                <label style="font-size: 0.85em;">To:</label>
+                                <input type="number" id="expEndYear" class="input-compact" style="width: 50px;" value="${results.inputs.projectYears}" min="1">
+                                
+                                <select id="expGroupMode" class="input-compact" style="width: 120px;">
+                                    <option value="detailed">Detailed Items</option>
+                                    <option value="major">Major Groups</option>
+                                </select>
+
+                                <button class="btn btn-primary btn-sm" onclick="window.dashboardApp.updateExpenseChart()">
+                                    Update
+                                </button>
+                            </div>
                         </div>
-                    </div>
-                    <div class="card glass-panel col-item">
-                        <h3><i class="fa-solid fa-heart-pulse"></i> Financial Health (DSCR)</h3>
-                        <div class="chart-container" style="height: 300px;">
-                            <canvas id="dscrChart"></canvas>
+                        <div class="chart-container" style="height: 350px;">
+                            <canvas id="expenseChart"></canvas>
                         </div>
                     </div>
                 </div>
@@ -91,11 +104,8 @@ class DashboardManager {
                 <div class="card glass-panel full-width" style="margin-top: 20px;">
                     <div class="card-header">
                          <h3><i class="fa-solid fa-table"></i> Detailed Cash Flow</h3>
-                         <button class="btn btn-secondary btn-sm" onclick="document.getElementById('detail-table-wrapper').classList.toggle('hidden')">
-                            Toggle View
-                         </button>
                     </div>
-                    <div id="detail-table-wrapper" class="hidden" style="overflow-x: auto; margin-top: 10px;">
+                    <div id="detail-table-wrapper" style="overflow-x: auto; margin-top: 10px;">
                         <div id="detail-table-container"></div>
                     </div>
                 </div>
@@ -106,7 +116,6 @@ class DashboardManager {
         requestAnimationFrame(() => {
             this.renderCharts(results);
             this.renderExpenseChart(results);
-            this.renderDSCRChart(results);
             this.renderDetailTable(results);
         });
     }
@@ -255,33 +264,109 @@ class DashboardManager {
         }).format(value);
     }
 
-    renderExpenseChart(results) {
+    updateExpenseChart() {
+        if (!this.lastResults) return;
+        const start = parseInt(document.getElementById('expStartYear').value) || 1;
+        const end = parseInt(document.getElementById('expEndYear').value) || this.lastResults.inputs.projectYears;
+        const mode = document.getElementById('expGroupMode').value || 'detailed';
+
+        this.renderExpenseChart(this.lastResults, start, end, mode);
+    }
+
+    renderExpenseChart(results, startYear = 1, endYear = null, mode = 'detailed') {
         const ctx = document.getElementById('expenseChart').getContext('2d');
-        const avg = (arr) => arr.reduce((a, b) => a + b, 0) / arr.length;
 
-        const fixed = avg(results.details.annualFixedCost);
-        const variable = avg(results.details.annualVariableCost);
-        const finance = avg(results.details.annualFinanceCost);
-        const tax = avg(results.details.annualTax);
+        // Cache for updates
+        this.lastResults = results;
+        if (endYear === null) endYear = results.inputs.projectYears;
 
-        new Chart(ctx, {
-            type: 'doughnut',
+        // Ensure range validity
+        if (startYear < 1) startYear = 1;
+        if (endYear > results.inputs.projectYears) endYear = results.inputs.projectYears;
+        if (startYear > endYear) startYear = endYear;
+
+        // Aggregate Costs
+        const totals = {};
+        const add = (k, v) => totals[k] = (totals[k] || 0) + v;
+
+        // Loop through selected years
+        for (let y = startYear; y <= endYear; y++) {
+            if (mode === 'detailed') {
+                // 1. Detailed Items
+                const yearData = results.details.annualItemizedOpex[y] || {};
+                for (const [key, val] of Object.entries(yearData)) {
+                    add(key, val);
+                }
+                // Finance & Tax manual add for detailed view
+                add('Finance Cost', results.details.annualFinanceCost[y] || 0);
+                add('Corporate Tax', results.details.annualTax[y] || 0);
+            } else {
+                // 2. Major Groups
+                add('Fixed Cost', results.details.annualFixedCost[y] || 0);
+                add('Variable Cost', results.details.annualVariableCost[y] || 0);
+                add('Finance Cost', results.details.annualFinanceCost[y] || 0);
+                add('Corporate Tax', results.details.annualTax[y] || 0);
+            }
+        }
+
+        // Filter 0
+        const finalTotals = {};
+        for (const [k, v] of Object.entries(totals)) {
+            if (v > 1) finalTotals[k] = v;
+        }
+
+        // Sort and Top
+        let labels = [];
+        let data = [];
+
+        if (mode === 'major') {
+            const order = ['Fixed Cost', 'Variable Cost', 'Finance Cost', 'Corporate Tax'];
+            labels = order.filter(k => finalTotals[k] !== undefined);
+            data = labels.map(k => finalTotals[k]);
+        } else {
+            const sortedEntries = Object.entries(finalTotals).sort((a, b) => b[1] - a[1]);
+            let otherSum = 0;
+            sortedEntries.forEach((entry, index) => {
+                if (index < 8) {
+                    labels.push(entry[0]);
+                    data.push(entry[1]);
+                } else {
+                    otherSum += entry[1];
+                }
+            });
+            if (otherSum > 0) {
+                labels.push('Others');
+                data.push(otherSum);
+            }
+        }
+
+        // Colors
+        const colorMap = {
+            'Fixed Cost': 'rgba(255, 159, 64, 0.7)',
+            'Variable Cost': 'rgba(153, 102, 255, 0.7)',
+            'Finance Cost': 'rgba(201, 203, 207, 0.7)',
+            'Corporate Tax': 'rgba(255, 99, 132, 0.7)',
+            'Personnel Expenses': 'rgba(54, 162, 235, 0.7)',
+            'Admin Expenses': 'rgba(255, 205, 86, 0.7)',
+            'Fuel & Energy': 'rgba(75, 192, 192, 0.7)',
+            'Maintenance': 'rgba(153, 102, 255, 0.7)',
+            'Others': '#c9cbcf'
+        };
+        const defaultColors = ['#FF6384', '#36A2EB', '#FFCE56', '#4BC0C0', '#9966FF', '#FF9F40', '#C9CBCF'];
+        const backgroundColors = labels.map((l, i) => colorMap[l] || defaultColors[i % defaultColors.length]);
+
+        if (this.expenseChartInstance) {
+            this.expenseChartInstance.destroy();
+        }
+
+        this.expenseChartInstance = new Chart(ctx, {
+            type: mode === 'major' ? 'pie' : 'doughnut',
             data: {
-                labels: ['Fixed Opex', 'Variable Opex', 'Finance Cost', 'Corporate Tax'],
+                labels: labels,
                 datasets: [{
-                    data: [fixed, variable, finance, tax],
-                    backgroundColor: [
-                        'rgba(255, 159, 64, 0.7)',
-                        'rgba(153, 102, 255, 0.7)',
-                        'rgba(201, 203, 207, 0.7)',
-                        'rgba(255, 99, 132, 0.7)'
-                    ],
-                    borderColor: [
-                        'rgba(255, 159, 64, 1)',
-                        'rgba(153, 102, 255, 1)',
-                        'rgba(201, 203, 207, 1)',
-                        'rgba(255, 99, 132, 1)'
-                    ],
+                    data: data,
+                    backgroundColor: backgroundColors,
+                    borderColor: '#fff',
                     borderWidth: 1
                 }]
             },
@@ -289,7 +374,10 @@ class DashboardManager {
                 responsive: true,
                 maintainAspectRatio: false,
                 plugins: {
-                    legend: { position: 'right' },
+                    legend: {
+                        position: 'right',
+                        onClick: null // Disable clicking to hide
+                    },
                     tooltip: {
                         callbacks: {
                             label: (context) => {
@@ -299,53 +387,10 @@ class DashboardManager {
                                 return `${context.label}: ${this.formatCurrency(val)} (${pct})`;
                             }
                         }
-                    }
-                }
-            }
-        });
-    }
-
-    renderDSCRChart(results) {
-        const ctx = document.getElementById('dscrChart').getContext('2d');
-        const labels = results.cashFlows.map((_, i) => `Year ${i}`);
-        const dscrData = results.details.annualDSCR.slice(1);
-        const dscrLabels = labels.slice(1);
-
-        new Chart(ctx, {
-            type: 'line',
-            data: {
-                labels: dscrLabels,
-                datasets: [{
-                    label: 'DSCR',
-                    data: dscrData,
-                    borderColor: 'rgba(75, 192, 192, 1)',
-                    backgroundColor: 'rgba(75, 192, 192, 0.2)',
-                    fill: true,
-                    tension: 0.3
-                }]
-            },
-            options: {
-                responsive: true,
-                maintainAspectRatio: false,
-                scales: {
-                    y: {
-                        beginAtZero: true,
-                        title: { display: true, text: 'Ratio (x)' }
-                    }
-                },
-                plugins: {
-                    annotation: {
-                        annotations: {
-                            line1: {
-                                type: 'line',
-                                yMin: 1.2,
-                                yMax: 1.2,
-                                borderColor: 'red',
-                                borderWidth: 2,
-                                borderDash: [5, 5],
-                                label: { content: 'Min DSCR (1.2x)', enabled: true }
-                            }
-                        }
+                    },
+                    title: {
+                        display: true,
+                        text: `Expenses: Year ${startYear} - ${endYear} (${mode === 'major' ? 'Major Groups' : 'Detailed'})`
                     }
                 }
             }
@@ -356,6 +401,7 @@ class DashboardManager {
         const container = document.getElementById('detail-table-container');
         const years = Array.from({ length: results.inputs.projectYears }, (_, i) => i + 1);
 
+        // Removed Toggle button and hidden class
         let html = `<table class="data-table small-text" style="width:100%">
             <thead>
                 <tr>

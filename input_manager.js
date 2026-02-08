@@ -684,13 +684,24 @@ class InputManager {
         const loanAmount = totalCapex * debtRatio;
         const equityAmount = totalCapex - loanAmount;
 
-        const interestRate = (inputs.finance.interestRate || 0) / 100;
-        const loanTerm = inputs.finance.loanTerm || 10;
-        const annualDebtService = FinancialCalculator.pmt(interestRate, loanTerm, loanAmount);
+        // Simulation Overrides
+        let simInterestRate = (inputs.finance.interestRate || 0) / 100;
+        let simOpexInflation = (inputs.finance.opexInflation || 0) / 100;
+        let simTaxRate = (inputs.finance.taxRate || 0) / 100;
 
-        const taxRate = (inputs.finance.taxRate || 0) / 100;
+        // Check for Global Simulation Overrides
+        if (simulationEvents && simulationEvents.length > 0) {
+            simulationEvents.forEach(e => {
+                if (e.type === 'global_interest') simInterestRate = parseFloat(e.value) / 100;
+                if (e.type === 'global_inflation') simOpexInflation = parseFloat(e.value) / 100;
+                if (e.type === 'global_tax') simTaxRate = parseFloat(e.value) / 100;
+            });
+        }
+
+        const loanTerm = inputs.finance.loanTerm || 10;
+        const annualDebtService = FinancialCalculator.pmt(simInterestRate, loanTerm, loanAmount);
+
         const revenueEscalation = (inputs.revenue.escalation || 0) / 100;
-        const opexInflation = (inputs.finance.opexInflation || 0) / 100;
         const taxHoliday = inputs.finance.taxHoliday || 0;
         const degradationRate = (inputs.degradation || 0) / 100;
 
@@ -743,6 +754,9 @@ class InputManager {
         // Loop
         let currentLoanBalance = loanAmount;
 
+        // Additional Loans Array (supports multiple loans)
+        let additionalLoans = [];
+
         // Initialize Admin Costs
         let adminCosts = [];
         if (window.adminApp && typeof window.adminApp.getAnnualCosts === 'function') {
@@ -761,6 +775,26 @@ class InputManager {
             if (simulationEvents && simulationEvents.length > 0) {
                 simulationEvents.forEach(e => {
                     const isActive = year >= e.startYear && year <= (e.endYear || projectYears);
+
+                    // Activate Additional Loan at specific year
+                    if (e.type === 'new_loan' && year === parseInt(e.startYear)) {
+                        const amt = parseFloat(e.amount) || 0;
+                        const term = parseInt(e.term) || parseInt(e.endYear) || 10;
+                        const rate = (parseFloat(e.rate) || 0) / 100;
+
+                        if (amt > 0) {
+                            additionalLoans.push({
+                                balance: amt,
+                                rate: rate,
+                                termEnd: year + term - 1,
+                                payment: FinancialCalculator.pmt(rate, term, amt)
+                            });
+
+                            // Cash Inflow from borrowing
+                            equityCashFlows[year] += amt;
+                        }
+                    }
+
                     if (isActive) {
                         const val = parseFloat(e.value) || 0;
 
@@ -789,7 +823,7 @@ class InputManager {
 
             // --- Recalculate Revenue with Simulation Params ---
             const escalationFactor = Math.pow(1 + revenueEscalation, year - 1);
-            const inflationFactor = Math.pow(1 + opexInflation, year - 1);
+            const inflationFactor = Math.pow(1 + simOpexInflation, year - 1);
 
             // Degradation applies to Output/Efficiency
             const degradationFactor = Math.pow(1 - degradationRate, year - 1);
@@ -834,6 +868,21 @@ class InputManager {
                 });
             }
 
+            // --- Simulation: Extra Revenue ---
+            if (simulationEvents && simulationEvents.length > 0) {
+                simulationEvents.forEach(e => {
+                    if (e.type === 'extra_revenue' && year >= e.startYear && year <= (e.endYear || e.startYear)) {
+                        const val = parseFloat(e.value) || 0;
+                        // Mode check? Usually absolute for lumpsum
+                        if (e.mode === 'percent') {
+                            yearOtherRevenue += (yearBaseRevenue * (val / 100));
+                        } else {
+                            yearOtherRevenue += val;
+                        }
+                    }
+                });
+            }
+
             const yearRevenue = yearBaseRevenue + yearOtherRevenue;
 
             annualRevenue[year] = yearRevenue;
@@ -847,14 +896,10 @@ class InputManager {
                 let multiplier = 0;
                 const fType = item.freqType || 'yearly';
 
-                // Determine if active and multiplier based on frequency
-                if (fType === 'daily') {
-                    multiplier = inputs.daysPerYear || 365;
-                } else if (fType === 'monthly') {
-                    multiplier = 12;
-                } else if (fType === 'yearly') {
-                    multiplier = 1;
-                } else if (fType === 'every_n') {
+                if (fType === 'daily') multiplier = inputs.daysPerYear || 365;
+                else if (fType === 'monthly') multiplier = 12;
+                else if (fType === 'yearly') multiplier = 1;
+                else if (fType === 'every_n') {
                     const n = parseInt(item.customN) || 5;
                     if (year % n === 0) multiplier = 1;
                 } else if (fType === 'period') {
@@ -862,7 +907,6 @@ class InputManager {
                     const e = parseInt(item.endYear) || projectYears;
                     if (year >= s && year <= e) multiplier = 1;
                 } else {
-                    // Fallback legacy
                     const oldFreq = item.frequency || 1;
                     if (oldFreq === 1 || year % oldFreq === 0) multiplier = 1;
                 }
@@ -878,14 +922,12 @@ class InputManager {
                     else if (item.type === 'percent_machinery') baseCost = (item.value / 100) * (inputs.capex.machinery || 0);
                     else if (item.type === 'percent_const_mach') baseCost = (item.value / 100) * ((inputs.capex.construction || 0) + (inputs.capex.machinery || 0));
 
-                    // Apply quantity to unit price
                     baseCost *= qty;
-
                     cost = baseCost * multiplier * inflationFactor;
                 }
 
                 yearOpex += cost;
-                yearFixed += cost; // Assuming parameter OPEX is Fixed
+                yearFixed += cost;
                 yearItemized[item.name] = (yearItemized[item.name] || 0) + cost;
             });
 
@@ -901,29 +943,23 @@ class InputManager {
 
                         const annualPerHead = (salary * 12) + (salary * bonus);
                         const growthFactor = Math.pow(1 + (increase / 100), year - 1);
-
                         const totalJobCost = annualPerHead * count * growthFactor * personnelMultiplier;
 
                         totalPersonnel += totalJobCost;
                         yearOpex += totalJobCost;
-                        yearFixed += totalJobCost; // Personnel is Fixed
+                        yearFixed += totalJobCost;
                     }
                 });
-                if (totalPersonnel > 0) {
-                    yearItemized['Personnel Expenses'] = totalPersonnel;
-                }
+                if (totalPersonnel > 0) yearItemized['Personnel Expenses'] = totalPersonnel;
             }
 
             // --- Detailed Variable OPEX ---
             if (inputs.detailedOpex && Array.isArray(inputs.detailedOpex)) {
-                // Dependency Resolver
                 const getDetQty = (item, depth = 0) => {
                     if (depth > 5) return 0;
                     if (item.mode === 'linked' && item.linkedSourceId) {
                         const source = inputs.detailedOpex.find(i => i.id === item.linkedSourceId);
-                        if (source) {
-                            return getDetQty(source, depth + 1) * ((parseFloat(item.multiplier) || 0) / 100);
-                        }
+                        if (source) return getDetQty(source, depth + 1) * (parseFloat(item.multiplier) || 0) / 100;
                     }
                     return parseFloat(item.quantity) || 0;
                 };
@@ -932,9 +968,7 @@ class InputManager {
                     const price = parseFloat(item.price) || 0;
                     const qty = getDetQty(item);
 
-                    // Frequency Logic
                     let fType = item.freqType;
-                    // If linked, inherit frequency from source (since UI hides it)
                     if (item.mode === 'linked' && item.linkedSourceId) {
                         const source = inputs.detailedOpex.find(i => i.id === item.linkedSourceId);
                         if (source) fType = source.freqType;
@@ -950,7 +984,7 @@ class InputManager {
                         const catName = item.category || 'Variable Expenses';
                         yearItemized[catName] = (yearItemized[catName] || 0) + annualCost;
                         yearOpex += annualCost;
-                        yearVariable += annualCost; // Detailed is Variable
+                        yearVariable += annualCost;
                     }
                 });
             }
@@ -967,7 +1001,6 @@ class InputManager {
             if (simOpexPct !== 0 || simOpexAbs !== 0) {
                 const opexAdjustment = (yearOpex * (simOpexPct / 100)) + simOpexAbs;
                 yearOpex += opexAdjustment;
-                // Treat adjustment as variable for simplicity
                 yearVariable += opexAdjustment;
                 yearItemized['Simulation Adjustment'] = opexAdjustment;
             }
@@ -993,61 +1026,83 @@ class InputManager {
                 // Beginning Balance for this year
                 annualLoanBalance[year] = currentLoanBalance;
 
-                interestExp = currentLoanBalance * interestRate;
+                interestExp = currentLoanBalance * simInterestRate;
                 const payment = annualDebtService;
                 principalRepay = payment - interestExp;
                 if (principalRepay > currentLoanBalance) principalRepay = currentLoanBalance;
-
-                // End Balance
-                currentLoanBalance -= principalRepay;
-                if (currentLoanBalance < 0) currentLoanBalance = 0;
             }
+
+            // Additional Loans (loop through all active loans)
+            additionalLoans.forEach(loan => {
+                if (loan.balance > 0 && year <= loan.termEnd) {
+                    const secInterest = loan.balance * loan.rate;
+                    let secPrincipal = loan.payment - secInterest;
+                    if (secPrincipal > loan.balance) secPrincipal = loan.balance;
+
+                    interestExp += secInterest;
+                    principalRepay += secPrincipal;
+                    loan.balance -= secPrincipal;
+                }
+            });
+
+            // Total Finance Cost
             annualInterest[year] = interestExp;
             annualPrincipal[year] = principalRepay;
             annualFinanceCost[year] = interestExp + principalRepay;
 
             // Tax
-            const ebt = ebit - interestExp;
-
-            // Apply Tax Holiday Logic
-            let effectiveTaxRate = taxRate;
-            if (year <= taxHoliday) {
-                effectiveTaxRate = 0;
+            const taxableIncome = ebit - interestExp;
+            let tax = 0;
+            if (year > taxHoliday && taxableIncome > 0) {
+                tax = taxableIncome * simTaxRate;
             }
-
-            const tax = (ebt > 0) ? ebt * effectiveTaxRate : 0;
             annualTax[year] = tax;
 
-            // Net Income
-            const netIncome = ebt - tax;
+            const netIncome = taxableIncome - tax;
             annualNetIncome[year] = netIncome;
 
             // Cash Flows
+            // Project CF = EBITDA - Tax
+            const projectCF = ebitda - annualTax[year];
+            projectCashFlows[year] = projectCF;
+
             const equityCF = netIncome + annualDepreciation - principalRepay;
             equityCashFlows[year] = equityCF;
 
-            const unleveredTax = (ebit > 0) ? ebit * effectiveTaxRate : 0;
-            const unleveredCF = ebitda - unleveredTax;
-            projectCashFlows[year] = unleveredCF;
+            costsArray[year] = yearOpex + annualDepreciation + interestExp;
+            energyArray[year] = yearTotalEnergy * degradationFactor;
 
-
-            // DSCR Calculation
-            // DSCR = (EBITDA - Tax) / Debt Service (Principal + Interest)
-            // Note: Some definitions use CFADS (Cash Flow Available for Debt Service)
-            const debtService = principalRepay + interestExp;
-            if (debtService > 0) {
-                // Simplified CFADS = EBITDA - Tax (assuming tax is paid before debt service?? No, Tax is after Interest)
-                // Actually standard DSCR = (EBITDA - Tax) / (Principal + Interest) is common but Tax validity depends on EBT which depends on Interest.
-                // Let's use Operating CF (Net Income + Depreciation + Interest) ? 
-                // Let's use: CFADS = EBITDA - Tax Paid
-                const cfads = ebitda - tax;
-                annualDSCR[year] = cfads / debtService;
-            } else {
-                annualDSCR[year] = 0; // No debt service
+            // Update Loan Balance
+            if (year <= loanTerm) {
+                // Actual loan balance update should track precise principal
+                const pmt = annualDebtService;
+                const int = currentLoanBalance * simInterestRate;
+                const princ = pmt - int;
+                currentLoanBalance -= princ;
+                if (currentLoanBalance < 0) currentLoanBalance = 0;
             }
 
-            costsArray[year] = yearOpex;
-            energyArray[year] = yearTotalEnergy * degradationFactor;
+            // Calculate total secondary loan stats for metrics
+            let totalSecondaryBalance = 0;
+            let totalSecondaryPayment = 0;
+            additionalLoans.forEach(l => {
+                totalSecondaryBalance += l.balance;
+                if (l.balance > 0) totalSecondaryPayment += l.payment;
+            });
+
+            annualLoanBalance[year] = currentLoanBalance + totalSecondaryBalance;
+
+            // DSCR
+            // annualFinanceCost already includes Primary + Secondary (Interest + Principal)
+            const totalDebtService = annualFinanceCost[year];
+
+            if (totalDebtService > 0) {
+                // CFADS = EBITDA - Tax
+                const cfads = ebitda - annualTax[year];
+                annualDSCR[year] = cfads / totalDebtService;
+            } else {
+                annualDSCR[year] = 0;
+            }
         }
 
         // --- 5. Metrics ---
@@ -1070,11 +1125,18 @@ class InputManager {
             return cumulative;
         });
 
+        let cumulativeEquity = 0;
+        const cumulativeEquityCashFlows = equityCashFlows.map(cf => {
+            cumulativeEquity += cf;
+            return cumulativeEquity;
+        });
+
         const results = {
             npv, irr, npvEquity, irrEquity, lcoe, payback,
             cashFlows: projectCashFlows,
             equityCashFlows,
             cumulativeCashFlows,
+            cumulativeEquityCashFlows,
             inputs,
             details: {
                 annualRevenue, annualOpex, annualItemizedOpex,

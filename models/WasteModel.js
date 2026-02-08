@@ -7,7 +7,6 @@ class WasteModel extends ModelStrategy {
         const { degradationFactor, escalationFactor, days } = params;
 
         // Waste Logic (Intake * Tipping Fee)
-        // Waste Logic (Intake * Tipping Fee)
         const simCapacity = params.simCapacity !== undefined ? params.simCapacity : inputs.capacity;
         const dailyIntake = simCapacity; // Tons/day
         const annualIntake = dailyIntake * days;
